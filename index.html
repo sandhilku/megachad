@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Big Boy Plan — Workout Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
   :root {
     --bg: #0a0a0c;
@@ -19,6 +20,7 @@
     --pull: #4fffff20;
     --push: #c8f13520;
     --legs: #ff6b9d20;
+    --upper: #ffa94d20;
     --rest: #6b6b8520;
   }
 
@@ -164,6 +166,7 @@
   .tag-pull { background: var(--pull); color: var(--accent2); border-color: #4fffff40; }
   .tag-push { background: var(--push); color: var(--accent); border-color: #c8f13540; }
   .tag-legs { background: var(--legs); color: #ff6b9d; border-color: #ff6b9d40; }
+  .tag-upper { background: var(--upper); color: #ffa94d; border-color: #ffa94d40; }
   .tag-rest { background: var(--rest); color: var(--muted); }
   .tag-optional { background: #a855f720; color: #a855f7; border-color: #a855f740; }
 
@@ -828,7 +831,146 @@
     color: var(--muted);
   }
 
+  /* CALENDAR */
+  .calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .calendar-month-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 24px;
+    letter-spacing: 2px;
+  }
+
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+  }
+
+  .calendar-dow {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: center;
+    padding-bottom: 4px;
+  }
+
+  .calendar-day {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.15s;
+  }
+
+  .calendar-day.empty { border: none; background: none; }
+
+  .calendar-day.trained {
+    border-color: var(--accent);
+    background: #c8f13512;
+  }
+
+  .calendar-day.today { box-shadow: 0 0 0 2px var(--accent2) inset; }
+
+  .calendar-day-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  .calendar-day.trained .calendar-day-num { color: var(--accent); font-weight: 600; }
+
+  .calendar-check {
+    font-size: 10px;
+    color: var(--accent);
+    line-height: 1;
+    margin-top: 2px;
+  }
+
+  .calendar-dots { display: flex; gap: 2px; margin-top: 2px; }
+
+  .calendar-dot { width: 5px; height: 5px; border-radius: 50%; }
+
+  .calendar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 16px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .calendar-legend-item { display: flex; align-items: center; gap: 6px; }
+
+  .calendar-year-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    align-items: start;
+  }
+
+  .mini-month {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+  }
+
+  .mini-month-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 13px;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    text-align: center;
+  }
+
+  .mini-month-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-auto-rows: 15px;
+    gap: 2px;
+  }
+
+  .mini-day {
+    border-radius: 2px;
+    background: var(--surface);
+    font-size: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    line-height: 1;
+  }
+
+  .mini-day.empty { background: none; }
+
+  .mini-day.trained {
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 700;
+  }
+
+  .mini-day.today { box-shadow: 0 0 0 1px var(--accent2) inset; }
+
+  @media (max-width: 900px) {
+    .calendar-year-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
   @media (max-width: 600px) {
+    .calendar-year-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .mini-month-grid { grid-auto-rows: 16px; }
+
     .section-title { font-size: 32px; }
     .plan-grid { grid-template-columns: 1fr; }
     .pr-grid { grid-template-columns: 1fr 1fr; }
@@ -843,9 +985,12 @@
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="showPage('today')">Today</button>
     <button class="nav-tab" onclick="showPage('history')">History</button>
+    <button class="nav-tab" onclick="showPage('calendar')">Calendar</button>
     <button class="nav-tab" onclick="showPage('prs')">PRs</button>
     <button class="nav-tab" onclick="showPage('stats')">Stats</button>
+    <button class="nav-tab" onclick="showPage('progress')">Progress</button>
     <button class="nav-tab" onclick="showPage('plan')">Plan</button>
+    <button class="nav-tab" onclick="showPage('settings')">Settings</button>
   </div>
 </nav>
 
@@ -887,6 +1032,37 @@
   <div id="history-list" class="history-list"></div>
 </div>
 
+<!-- CALENDAR -->
+<div id="page-calendar" class="page">
+  <div class="header-row">
+    <div>
+      <div class="section-title">Calendar</div>
+      <div class="section-sub" id="calendar-month-stat">Days trained this month</div>
+    </div>
+    <button class="filter-chip" id="calendar-view-toggle" onclick="toggleCalendarView()">View Full Year</button>
+  </div>
+
+  <div id="calendar-month-view">
+    <div class="calendar-header">
+      <button class="day-btn" onclick="changeCalendarMonth(-1)">‹</button>
+      <div class="calendar-month-label" id="calendar-month-label"></div>
+      <button class="day-btn" onclick="changeCalendarMonth(1)">›</button>
+    </div>
+    <div class="calendar-grid" id="calendar-grid"></div>
+    <div class="calendar-legend" id="calendar-legend"></div>
+  </div>
+
+  <div id="calendar-year-view" style="display:none;">
+    <div class="calendar-header">
+      <button class="day-btn" onclick="changeCalendarYear(-1)">‹</button>
+      <div class="calendar-month-label" id="calendar-year-label"></div>
+      <button class="day-btn" onclick="changeCalendarYear(1)">›</button>
+    </div>
+    <div class="calendar-year-grid" id="calendar-year-grid"></div>
+    <div class="calendar-legend" id="calendar-year-legend"></div>
+  </div>
+</div>
+
 <!-- PRs -->
 <div id="page-prs" class="page">
   <div class="header-row">
@@ -906,11 +1082,58 @@
   <div class="stats-grid" id="stats-grid"></div>
 </div>
 
+<!-- PROGRESS -->
+<div id="page-progress" class="page">
+  <div class="section-title">Progress</div>
+  <div class="section-sub">Track how your lifts are trending over time</div>
+  <div class="filter-row" id="progress-ex-filters"></div>
+  <div id="progress-empty" class="empty" style="display:none;">
+    <div class="empty-icon">📈</div>
+    <div>No logged sets for this exercise yet. Log a workout to see progress!</div>
+  </div>
+  <div id="progress-chart-wrap" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;">
+    <canvas id="progress-chart" height="110"></canvas>
+  </div>
+  <div class="stats-grid" id="progress-summary"></div>
+</div>
+
 <!-- PLAN -->
 <div id="page-plan" class="page">
   <div class="section-title">The Plan</div>
-  <div class="section-sub">6-Day Push / Pull / Legs Split · V-Taper Focused</div>
+  <div class="section-sub">Pull / Push / Legs / Upper / Legs · Custom Split</div>
   <div class="plan-grid" id="plan-grid"></div>
+</div>
+
+<!-- SETTINGS -->
+<div id="page-settings" class="page">
+  <div class="section-title">Settings</div>
+  <div class="section-sub">Backup, restore & preferences</div>
+
+  <div class="plan-card" style="padding:20px;margin-bottom:16px;">
+    <div class="plan-day-name" style="margin-bottom:10px;">Body Weight</div>
+    <div class="plan-focus" style="margin-bottom:14px;">Used to show your lifts as a ratio of bodyweight in PRs and Progress.</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <input class="modal-input" id="settings-bw-input" type="number" step="0.1" placeholder="Weight (kg)" style="margin-bottom:0;max-width:160px;">
+      <button class="modal-btn primary" style="flex:0 0 auto;padding:10px 18px;" onclick="saveBodyweight()">Save</button>
+    </div>
+    <div class="no-pr" style="margin-top:10px;" id="settings-bw-current"></div>
+  </div>
+
+  <div class="plan-card" style="padding:20px;margin-bottom:16px;">
+    <div class="plan-day-name" style="margin-bottom:10px;">Backup & Restore</div>
+    <div class="plan-focus" style="margin-bottom:14px;">Your data lives only in this browser's storage. Export a backup regularly, or use it to move your data to another device.</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="modal-btn primary" style="flex:0 0 auto;padding:10px 18px;" onclick="exportData()">⬇ Export Backup</button>
+      <button class="modal-btn" style="flex:0 0 auto;padding:10px 18px;" onclick="document.getElementById('import-file-input').click()">⬆ Import Backup</button>
+      <input type="file" id="import-file-input" accept="application/json" style="display:none;" onchange="importData(event)">
+    </div>
+  </div>
+
+  <div class="plan-card" style="padding:20px;">
+    <div class="plan-day-name" style="margin-bottom:10px;">Plan</div>
+    <div class="plan-focus" style="margin-bottom:14px;">If you've customized your plan in the Plan tab, this clears those edits and restores the built-in default plan.</div>
+    <button class="modal-btn" style="flex:0 0 auto;padding:10px 18px;color:var(--accent3);border-color:#ff4d6d40;" onclick="resetPlanToDefault()">Reset Plan to Default</button>
+  </div>
 </div>
 
 </main>
@@ -954,17 +1177,15 @@
 const PLAN = [
   {
     name: "Day 1 — Pull",
-    focus: "Back & Biceps",
+    focus: "Back, Biceps & Forearms",
     type: "pull",
     exercises: [
-      { name: "Lat Pulldowns", sets: 4, reps: "8–12" },
-      { name: "Seated Cable Rows", sets: 4, reps: "8–12" },
-      { name: "Straight-Arm Pulldowns", sets: 3, reps: "12–15" },
-      { name: "Reverse Pec Deck Fly", sets: 3, reps: "12–15" },
-      { name: "Bicep Curls (EZ/Dumbbell)", sets: 3, reps: "8–12" },
-      { name: "Hammer Curls", sets: 3, reps: "8–12" },
-      { name: "Reverse Grip Cable Curls", sets: 3, reps: "8–12" },
-      { name: "Cable Wrist Curls", sets: 3, reps: "16–20" },
+      { name: "T-Bar Row", sets: 3, reps: "8–12" },
+      { name: "Lat Pulldown", sets: 3, reps: "8–12" },
+      { name: "Single-Arm Cable Row", sets: 3, reps: "10–12" },
+      { name: "Single-Arm Dumbbell Preacher Curl", sets: 3, reps: "10–12" },
+      { name: "Reverse Cable Curl", sets: 3, reps: "10–12" },
+      { name: "Cable Forearm Curls", sets: 3, reps: "15–20" },
     ]
   },
   {
@@ -972,74 +1193,65 @@ const PLAN = [
     focus: "Chest, Shoulders & Triceps",
     type: "push",
     exercises: [
-      { name: "Chest Press", sets: 4, reps: "8–12" },
-      { name: "Incline Press", sets: 4, reps: "8–12" },
-      { name: "Cable Flyes", sets: 3, reps: "12–15" },
-      { name: "Overhead Press", sets: 4, reps: "8–12" },
-      { name: "Lateral Raises", sets: 4, reps: "12–15" },
-      { name: "Face Pulls", sets: 3, reps: "15–20" },
-      { name: "Rear Delt Flyes", sets: 3, reps: "12–15" },
-      { name: "Tricep Pushdowns or Dips", sets: 3, reps: "10–15" },
+      { name: "Bench Press", sets: 3, reps: "8–12" },
+      { name: "Incline Press", sets: 3, reps: "8–12" },
+      { name: "Pec Deck Fly", sets: 3, reps: "12–15" },
+      { name: "Shoulder Press", sets: 3, reps: "8–12" },
+      { name: "Lateral Raise", sets: 3, reps: "12–15" },
+      { name: "Rear Delt Cable Fly", sets: 3, reps: "12–15" },
+      { name: "Seated Tricep Extension", sets: 3, reps: "10–15" },
+      { name: "Overhead Tricep Extension", sets: 3, reps: "10–15" },
     ]
   },
   {
-    name: "Day 3 — Legs & Core",
+    name: "Day 3 — Legs",
     focus: "Quads, Hamstrings, Glutes & Core",
     type: "legs",
     exercises: [
-      { name: "Leg Press (feet high & wide)", sets: 4, reps: "8–12" },
-      { name: "Lunges", sets: 3, reps: "8–12" },
-      { name: "Hamstring Curls", sets: 3, reps: "10–15" },
-      { name: "Leg Extensions", sets: 3, reps: "10–15" },
+      { name: "RDL", sets: 3, reps: "8–12" },
+      { name: "Leg Press", sets: 3, reps: "8–12" },
+      { name: "Leg Extension", sets: 3, reps: "10–15" },
+      { name: "Leg Curl", sets: 3, reps: "10–15" },
       { name: "Hip Abduction Machine", sets: 3, reps: "15–20" },
+      { name: "Hip Adduction Machine", sets: 3, reps: "15–20" },
+      { name: "Calf Raises", sets: 3, reps: "12–15" },
       { name: "Cable Crunches", sets: 3, reps: "12–15" },
-      { name: "Hanging Leg Raises", sets: 3, reps: "10–15" },
-      { name: "Reverse Crunches", sets: 3, reps: "12–15" },
-      { name: "Planks", sets: 3, reps: "45–60s" },
     ]
   },
   {
-    name: "Day 4 — Pull",
-    focus: "Back & Biceps (Volume 2)",
-    type: "pull",
+    name: "Day 4 — Upper",
+    focus: "Chest, Shoulders, Back & Arms",
+    type: "upper",
     exercises: [
-      { name: "Lat Pulldowns", sets: 4, reps: "8–12" },
-      { name: "Seated Cable Rows", sets: 4, reps: "8–12" },
-      { name: "Single-Arm Dumbbell Rows", sets: 4, reps: "8–12" },
-      { name: "Straight-Arm Cable Pulls", sets: 3, reps: "12–15" },
-      { name: "Reverse Pec Deck Fly", sets: 3, reps: "12–15" },
-      { name: "Bicep Curls (EZ/Dumbbell)", sets: 3, reps: "8–12" },
-      { name: "Hammer Curls", sets: 3, reps: "10–12" },
+      { name: "Pec Deck Fly", sets: 3, reps: "12–15" },
+      { name: "Incline Press", sets: 3, reps: "8–12" },
+      { name: "Shoulder Press", sets: 3, reps: "8–12" },
+      { name: "T-Bar Row", sets: 3, reps: "8–12" },
+      { name: "Lat Pulldown", sets: 3, reps: "8–12" },
+      { name: "Single-Arm Dumbbell Preacher Curl", sets: 3, reps: "10–12" },
+      { name: "Seated Tricep Extension", sets: 3, reps: "10–15" },
     ]
   },
   {
-    name: "Day 5 — Push",
-    focus: "Chest, Shoulders & Arms (Volume 2)",
-    type: "push",
+    name: "Day 5 — Legs",
+    focus: "Quads, Hamstrings, Glutes & Core",
+    type: "legs",
     exercises: [
-      { name: "Chest Press", sets: 4, reps: "8–12" },
-      { name: "Incline Press", sets: 4, reps: "8–12" },
-      { name: "Cable Flyes", sets: 3, reps: "12–15" },
-      { name: "Overhead Press", sets: 4, reps: "8–12" },
-      { name: "Lateral Raises", sets: 3, reps: "12–15" },
-      { name: "Rear Delt Flyes", sets: 3, reps: "12–15" },
-      { name: "Tricep Pushdowns or Dips", sets: 3, reps: "10–15" },
-      { name: "Overhead Triceps Extension", sets: 3, reps: "10–15" },
-      { name: "Bicep Preacher Curls", sets: 3, reps: "8–12" },
+      { name: "RDL", sets: 3, reps: "8–12" },
+      { name: "Leg Press", sets: 3, reps: "8–12" },
+      { name: "Leg Extension", sets: 3, reps: "10–15" },
+      { name: "Leg Curl", sets: 3, reps: "10–15" },
+      { name: "Hip Abduction Machine", sets: 3, reps: "15–20" },
+      { name: "Hip Adduction Machine", sets: 3, reps: "15–20" },
+      { name: "Calf Raises", sets: 3, reps: "12–15" },
+      { name: "Cable Crunches", sets: 3, reps: "12–15" },
     ]
   },
   {
-    name: "Day 6 — Optional",
-    focus: "Light Core & Conditioning",
-    type: "optional",
-    exercises: [
-      { name: "HIIT Cardio", sets: 1, reps: "15–20 min" },
-      { name: "Hanging Leg Raises", sets: 3, reps: "10–15" },
-      { name: "Reverse Crunches", sets: 3, reps: "12–15" },
-      { name: "Planks", sets: 3, reps: "45–60s" },
-      { name: "Crunches", sets: 3, reps: "12–25" },
-      { name: "Light Rowing or Treadmill", sets: 1, reps: "10–15 min" },
-    ]
+    name: "Day 6 — Rest",
+    focus: "Recovery & Mobility",
+    type: "rest",
+    exercises: []
   },
   {
     name: "Day 7 — Rest",
@@ -1053,6 +1265,7 @@ const TYPE_TAGS = {
   pull: { cls: "tag-pull", label: "PULL" },
   push: { cls: "tag-push", label: "PUSH" },
   legs: { cls: "tag-legs", label: "LEGS" },
+  upper: { cls: "tag-upper", label: "UPPER" },
   optional: { cls: "tag-optional", label: "OPTIONAL" },
   rest: { cls: "tag-rest", label: "REST" },
 };
@@ -1060,6 +1273,101 @@ const TYPE_TAGS = {
 // Storage helpers
 function save(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 function load(key, def) { try { return JSON.parse(localStorage.getItem(key)) ?? def; } catch { return def; } }
+
+// Local-timezone-safe date key (avoids UTC off-by-one bugs from toISOString())
+function localDateKey(d) {
+  const dt = typeof d === 'string' ? new Date(d) : d;
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function getCurrentBodyweight() { return load('bodyweight', null); }
+
+function getLastSession(name) {
+  const history = load('history', []);
+  const sorted = [...history].sort((a, b) => new Date(b.date) - new Date(a.date));
+  for (const w of sorted) {
+    const ex = w.exercises.find(e => e.name === name);
+    if (ex) {
+      const validSets = ex.sets.filter(s => s.weight && s.reps);
+      if (validSets.length > 0) return { date: w.date, sets: validSets };
+    }
+  }
+  return null;
+}
+
+// ===================== SETTINGS =====================
+function renderSettings() {
+  const bw = getCurrentBodyweight();
+  document.getElementById('settings-bw-current').textContent =
+    bw ? `Current: ${bw}kg` : 'No body weight logged yet';
+}
+
+function saveBodyweight() {
+  const input = document.getElementById('settings-bw-input');
+  const val = parseFloat(input.value);
+  if (!val || val <= 0) { toast('Enter a valid weight'); return; }
+  const log = load('bodyweightLog', []);
+  log.push({ date: new Date().toISOString(), weight: val });
+  save('bodyweightLog', log);
+  save('bodyweight', val);
+  input.value = '';
+  renderSettings();
+  toast('Body weight saved');
+}
+
+function exportData() {
+  const data = {
+    exportedAt: new Date().toISOString(),
+    history: load('history', []),
+    prs: load('prs', {}),
+    customPlan: load('customPlan', null),
+    bodyweight: load('bodyweight', null),
+    bodyweightLog: load('bodyweightLog', []),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `workout-backup-${localDateKey(new Date())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Backup exported');
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data || typeof data !== 'object') throw new Error('bad file');
+      if (Array.isArray(data.history)) save('history', data.history);
+      if (data.prs) save('prs', data.prs);
+      if ('customPlan' in data) save('customPlan', data.customPlan);
+      if ('bodyweight' in data) save('bodyweight', data.bodyweight);
+      if (Array.isArray(data.bodyweightLog)) save('bodyweightLog', data.bodyweightLog);
+      toast('Backup imported — reloading…');
+      setTimeout(() => location.reload(), 900);
+    } catch (err) {
+      toast('That file doesn\'t look like a valid backup');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function resetPlanToDefault() {
+  if (!confirm('Reset your plan back to the built-in default? Any custom exercises you added will be removed.')) return;
+  save('customPlan', null);
+  renderPlan();
+  toast('Plan reset to default');
+}
 
 // State
 let currentDay = load('currentDay', 0);
@@ -1073,9 +1381,12 @@ function showPage(id) {
   document.getElementById('page-' + id).classList.add('active');
   event.target.classList.add('active');
   if (id === 'history') renderHistory();
+  if (id === 'calendar') renderCalendar();
   if (id === 'prs') renderPRs();
   if (id === 'stats') renderStats();
+  if (id === 'progress') renderProgress();
   if (id === 'plan') renderPlan();
+  if (id === 'settings') renderSettings();
 }
 
 // ===================== TODAY =====================
@@ -1128,7 +1439,9 @@ function renderToday() {
   list.innerHTML = day.exercises.map((ex, ei) => {
     const pr = getPR(ex.name);
     const prHint = pr ? `<div class="pr-hint">🏆 PR: ${pr.weight}kg × ${pr.reps} reps</div>` : '';
-    const setsHTML = buildSetsHTML(ex, ei);
+    const last = getLastSession(ex.name);
+    const lastHint = last ? `<div class="pr-hint" style="color:var(--accent2);border-color:#4fffff30;background:#4fffff10;">⏱ Last: ${last.sets.map(s => `${s.weight}×${s.reps}`).join(', ')}</div>` : '';
+    const setsHTML = buildSetsHTML(ex, ei, last);
     return `
       <div class="exercise-card" id="ex-card-${ei}">
         <div class="exercise-header" onclick="toggleEx(${ei})">
@@ -1141,6 +1454,7 @@ function renderToday() {
         </div>
         <div class="sets-panel">
           ${prHint}
+          ${lastHint}
           <div class="set-labels">
             <div class="set-label">#</div>
             <div class="set-label">Weight (kg)</div>
@@ -1153,17 +1467,22 @@ function renderToday() {
   }).join('');
 }
 
-function buildSetsHTML(ex, ei) {
+function buildSetsHTML(ex, ei, last) {
   if (!setData[ei]) setData[ei] = Array.from({length: ex.sets}, () => ({ weight: '', reps: '', done: false }));
-  return setData[ei].map((s, si) => `
+  return setData[ei].map((s, si) => {
+    const lastSet = last && last.sets[si];
+    const wPlaceholder = lastSet ? lastSet.weight : 'kg';
+    const rPlaceholder = lastSet ? lastSet.reps : 'reps';
+    return `
     <div class="set-row">
       <div class="set-num">${si+1}</div>
-      <input class="set-input" type="number" placeholder="kg" step="0.5" value="${s.weight}"
+      <input class="set-input" type="number" placeholder="${wPlaceholder}" step="0.5" value="${s.weight}"
         onchange="updateSet(${ei},${si},'weight',this.value)">
-      <input class="set-input" type="number" placeholder="reps" value="${s.reps}"
+      <input class="set-input" type="number" placeholder="${rPlaceholder}" value="${s.reps}"
         onchange="updateSet(${ei},${si},'reps',this.value)">
       <button class="set-done ${s.done?'done':''}" onclick="toggleSetDone(${ei},${si})" title="Mark done">✓</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function toggleEx(ei) {
@@ -1262,12 +1581,13 @@ let prFilter = 'all';
 
 function renderPRs() {
   const prs = load('prs', {});
+  const bw = getCurrentBodyweight();
   const filters = document.getElementById('pr-filters');
   const grid = document.getElementById('pr-grid');
 
   // Get all unique exercise names from plan
   const allExercises = [];
-  const types = ['all', 'pull', 'push', 'legs', 'optional'];
+  const types = ['all', 'pull', 'push', 'legs', 'upper', 'optional'];
   PLAN.forEach(day => day.exercises.forEach(ex => {
     if (!allExercises.find(e => e.name === ex.name)) {
       allExercises.push({ name: ex.name, type: day.type });
@@ -1295,7 +1615,7 @@ function renderPRs() {
             <div class="pr-value">${pr.weight}</div>
             <div class="pr-unit">kg × ${pr.reps} reps</div>
           </div>
-          <div class="pr-date">${new Date(pr.date).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})}</div>
+          <div class="pr-date">${new Date(pr.date).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})}${bw ? ` · ${(pr.weight/bw).toFixed(2)}× bodyweight` : ''}</div>
         ` : `<div class="no-pr">No PR logged yet</div>`}
       </div>`;
   }).join('');
@@ -1362,13 +1682,13 @@ function renderStats() {
   history.forEach(w => { typeCounts[w.type] = (typeCounts[w.type]||0)+1; });
   const fav = Object.entries(typeCounts).sort((a,b)=>b[1]-a[1])[0];
 
-  // Streak
+  // Streak (local-timezone-safe: avoids UTC off-by-one at day boundaries)
   let streak = 0;
-  const days = [...new Set(history.map(w => w.date.split('T')[0]))].sort().reverse();
-  const today = new Date().toISOString().split('T')[0];
-  let check = today;
+  const days = [...new Set(history.map(w => localDateKey(w.date)))].sort().reverse();
+  let checkDate = new Date();
+  checkDate.setHours(0, 0, 0, 0);
   for (const d of days) {
-    if (d === check) { streak++; const dt = new Date(check); dt.setDate(dt.getDate()-1); check = dt.toISOString().split('T')[0]; }
+    if (d === localDateKey(checkDate)) { streak++; checkDate.setDate(checkDate.getDate() - 1); }
     else break;
   }
 
@@ -1404,6 +1724,408 @@ function renderStats() {
       <div class="stat-sub">${fav ? fav[1]+' sessions' : 'no data yet'}</div>
     </div>
   `;
+}
+
+// ===================== CALENDAR =====================
+const DOT_COLORS = { pull: '#4fffff', push: '#c8f135', legs: '#ff6b9d', upper: '#ffa94d', optional: '#a855f7', rest: '#6b6b85' };
+
+let calendarDate = new Date();
+calendarDate.setDate(1);
+let calendarViewMode = 'month'; // 'month' | 'year'
+let calendarYearView = new Date().getFullYear();
+
+function getWorkoutsByDate() {
+  const history = load('history', []);
+  const byDate = {};
+  history.forEach(w => {
+    const d = localDateKey(w.date);
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(w);
+  });
+  return byDate;
+}
+
+function calendarLegendHtml() {
+  return Object.entries(TYPE_TAGS).map(([key, tag]) => `
+    <div class="calendar-legend-item">
+      <span class="calendar-dot" style="background:${DOT_COLORS[key] || 'var(--muted)'}"></span>
+      ${tag.label}
+    </div>`).join('');
+}
+
+function toggleCalendarView() {
+  calendarViewMode = calendarViewMode === 'month' ? 'year' : 'month';
+  renderCalendar();
+}
+
+function changeCalendarMonth(delta) {
+  calendarDate.setMonth(calendarDate.getMonth() + delta);
+  renderCalendar();
+}
+
+function changeCalendarYear(delta) {
+  calendarYearView += delta;
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const toggleBtn = document.getElementById('calendar-view-toggle');
+  const monthView = document.getElementById('calendar-month-view');
+  const yearView = document.getElementById('calendar-year-view');
+
+  if (calendarViewMode === 'month') {
+    toggleBtn.textContent = 'View Full Year';
+    monthView.style.display = 'block';
+    yearView.style.display = 'none';
+    renderCalendarMonth();
+  } else {
+    toggleBtn.textContent = 'View Month';
+    monthView.style.display = 'none';
+    yearView.style.display = 'block';
+    renderCalendarYear();
+  }
+}
+
+function renderCalendarMonth() {
+  const byDate = getWorkoutsByDate();
+
+  const year = calendarDate.getFullYear();
+  const month = calendarDate.getMonth();
+  document.getElementById('calendar-month-label').textContent =
+    calendarDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+  const firstDay = new Date(year, month, 1);
+  const startOffset = firstDay.getDay(); // 0 = Sun
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayStr = localDateKey(new Date());
+  const dowNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  let html = dowNames.map(d => `<div class="calendar-dow">${d}</div>`).join('');
+  for (let i = 0; i < startOffset; i++) html += `<div class="calendar-day empty"></div>`;
+
+  let monthTrainedCount = 0;
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const workouts = byDate[dateStr];
+    const trained = !!workouts;
+    if (trained) monthTrainedCount++;
+    const isToday = dateStr === todayStr;
+    let dotsHtml = '';
+    if (trained) {
+      const types = [...new Set(workouts.map(w => w.type))];
+      dotsHtml = `<div class="calendar-dots">${types.map(t => `<span class="calendar-dot" style="background:${DOT_COLORS[t] || 'var(--muted)'}"></span>`).join('')}</div>`;
+    }
+    const title = trained ? workouts.map(w => w.dayName).join(', ') : 'No workout logged';
+    html += `<div class="calendar-day ${trained ? 'trained' : ''} ${isToday ? 'today' : ''}" title="${title}">
+      <div class="calendar-day-num">${day}</div>
+      ${trained ? '<div class="calendar-check">✓</div>' : ''}
+      ${dotsHtml}
+    </div>`;
+  }
+
+  document.getElementById('calendar-grid').innerHTML = html;
+  document.getElementById('calendar-month-stat').textContent =
+    `${monthTrainedCount} day${monthTrainedCount === 1 ? '' : 's'} trained this month`;
+
+  document.getElementById('calendar-legend').innerHTML = calendarLegendHtml();
+}
+
+function renderCalendarYear() {
+  const byDate = getWorkoutsByDate();
+  const todayStr = localDateKey(new Date());
+
+  document.getElementById('calendar-year-label').textContent = calendarYearView;
+
+  const yearTrainedCount = Object.keys(byDate).filter(d => d.startsWith(`${calendarYearView}-`)).length;
+  document.getElementById('calendar-month-stat').textContent =
+    `${yearTrainedCount} day${yearTrainedCount === 1 ? '' : 's'} trained in ${calendarYearView}`;
+
+  let html = '';
+  for (let month = 0; month < 12; month++) {
+    const monthName = new Date(calendarYearView, month, 1).toLocaleDateString('en-GB', { month: 'long' });
+    const firstDay = new Date(calendarYearView, month, 1);
+    const startOffset = firstDay.getDay();
+    const daysInMonth = new Date(calendarYearView, month + 1, 0).getDate();
+    let monthTrained = 0;
+    let cells = '';
+    for (let i = 0; i < startOffset; i++) cells += `<div class="mini-day empty"></div>`;
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${calendarYearView}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const workouts = byDate[dateStr];
+      const trained = !!workouts;
+      if (trained) monthTrained++;
+      const isToday = dateStr === todayStr;
+      const title = trained ? workouts.map(w => w.dayName).join(', ') : '';
+      cells += `<div class="mini-day ${trained ? 'trained' : ''} ${isToday ? 'today' : ''}" title="${title}">${day}</div>`;
+    }
+    html += `
+      <div class="mini-month">
+        <div class="mini-month-title">${monthName} <span style="color:var(--muted);font-weight:400;font-family:'DM Mono',monospace;font-size:11px;">(${monthTrained})</span></div>
+        <div class="mini-month-grid">${cells}</div>
+      </div>`;
+  }
+
+  document.getElementById('calendar-year-grid').innerHTML = html;
+  document.getElementById('calendar-year-legend').innerHTML = calendarLegendHtml();
+}
+
+// ===================== PROGRESS =====================
+let progressEx = load('progressEx', null);
+let progressChartInstance = null;
+
+function getExerciseHistory(name) {
+  const history = load('history', []);
+  const sorted = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const points = [];
+  sorted.forEach(w => {
+    const ex = w.exercises.find(e => e.name === name);
+    if (!ex) return;
+    const validSets = ex.sets.filter(s => s.weight && s.reps);
+    if (validSets.length === 0) return;
+    let best = validSets[0];
+    validSets.forEach(s => {
+      const w1 = parseFloat(s.weight) || 0, r1 = parseInt(s.reps) || 0;
+      const wB = parseFloat(best.weight) || 0, rB = parseInt(best.reps) || 0;
+      if (w1 > wB || (w1 === wB && r1 > rB)) best = s;
+    });
+    const weight = parseFloat(best.weight) || 0;
+    const reps = parseInt(best.reps) || 0;
+    const est1rm = reps > 0 ? Math.round(weight * (1 + reps / 30) * 10) / 10 : weight;
+    points.push({ date: w.date, weight, reps, est1rm });
+  });
+  return points;
+}
+
+function getVolumeHistory() {
+  const history = load('history', []);
+  const sorted = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
+  return sorted.map(w => {
+    const vol = w.exercises.reduce((a, e) => a + e.sets.reduce((b, s) => b + (parseFloat(s.weight) || 0) * (parseInt(s.reps) || 0), 0), 0);
+    return { date: w.date, volume: Math.round(vol) };
+  }).filter(p => p.volume > 0);
+}
+
+function renderProgress() {
+  const history = load('history', []);
+  const filters = document.getElementById('progress-ex-filters');
+  const chartWrap = document.getElementById('progress-chart-wrap');
+  const emptyState = document.getElementById('progress-empty');
+  const summary = document.getElementById('progress-summary');
+
+  const namesSet = new Set();
+  history.forEach(w => w.exercises.forEach(e => {
+    if (e.sets.some(s => s.weight && s.reps)) namesSet.add(e.name);
+  }));
+  const names = [...namesSet].sort();
+
+  if (names.length === 0) {
+    filters.innerHTML = '';
+    chartWrap.style.display = 'none';
+    summary.innerHTML = '';
+    emptyState.style.display = 'block';
+    emptyState.querySelector('div:last-child').textContent = 'No logged sets yet. Log a workout to see progress!';
+    return;
+  }
+
+  if (!progressEx || (progressEx !== '__volume__' && !names.includes(progressEx))) progressEx = '__volume__';
+
+  filters.innerHTML =
+    `<button class="filter-chip ${progressEx === '__volume__' ? 'active' : ''}" onclick="setProgressEx('__volume__')">📊 Total Volume</button>` +
+    names.map(n => `
+    <button class="filter-chip ${n === progressEx ? 'active' : ''}" onclick="setProgressEx('${n.replace(/'/g, "\\'")}')">${n}</button>
+  `).join('');
+
+  if (progressEx === '__volume__') {
+    renderVolumeProgress(chartWrap, emptyState, summary);
+    return;
+  }
+
+  const points = getExerciseHistory(progressEx);
+
+  if (points.length === 0) {
+    chartWrap.style.display = 'none';
+    summary.innerHTML = '';
+    emptyState.style.display = 'block';
+    emptyState.querySelector('div:last-child').textContent = 'No logged sets for this exercise yet. Log a workout to see progress!';
+    return;
+  }
+
+  emptyState.style.display = 'none';
+  chartWrap.style.display = 'block';
+
+  drawProgressChart(points);
+
+  const first = points[0], last = points[points.length - 1];
+  const change = first.weight > 0 ? (((last.weight - first.weight) / first.weight) * 100) : 0;
+  const best = points.reduce((a, b) => (b.weight > a.weight ? b : a), points[0]);
+  const bw = getCurrentBodyweight();
+
+  summary.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Starting</div>
+      <div class="stat-value" style="font-size:28px;">${first.weight}<span style="font-size:14px;color:var(--muted);">kg</span></div>
+      <div class="stat-sub">${new Date(first.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Current</div>
+      <div class="stat-value" style="font-size:28px;">${last.weight}<span style="font-size:14px;color:var(--muted);">kg</span></div>
+      <div class="stat-sub">${new Date(last.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Change</div>
+      <div class="stat-value" style="font-size:28px;color:${change >= 0 ? 'var(--accent)' : 'var(--accent3)'};">${change >= 0 ? '+' : ''}${change.toFixed(1)}%</div>
+      <div class="stat-sub">since first log</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Best Set</div>
+      <div class="stat-value" style="font-size:28px;">${best.weight}<span style="font-size:14px;color:var(--muted);">kg</span></div>
+      <div class="stat-sub">× ${best.reps} reps</div>
+    </div>
+    ${bw ? `
+    <div class="stat-card">
+      <div class="stat-label">vs Bodyweight</div>
+      <div class="stat-value" style="font-size:28px;">${(last.weight / bw).toFixed(2)}<span style="font-size:14px;color:var(--muted);">×</span></div>
+      <div class="stat-sub">at ${bw}kg bodyweight</div>
+    </div>` : ''}
+  `;
+}
+
+function renderVolumeProgress(chartWrap, emptyState, summary) {
+  const points = getVolumeHistory();
+
+  if (points.length === 0) {
+    chartWrap.style.display = 'none';
+    summary.innerHTML = '';
+    emptyState.style.display = 'block';
+    emptyState.querySelector('div:last-child').textContent = 'No logged sets yet. Log a workout to see progress!';
+    return;
+  }
+
+  emptyState.style.display = 'none';
+  chartWrap.style.display = 'block';
+
+  drawVolumeChart(points);
+
+  const totalVol = points.reduce((a, p) => a + p.volume, 0);
+  const avgVol = Math.round(totalVol / points.length);
+  const first = points[0], last = points[points.length - 1];
+  const change = first.volume > 0 ? (((last.volume - first.volume) / first.volume) * 100) : 0;
+
+  summary.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Sessions</div>
+      <div class="stat-value" style="font-size:28px;">${points.length}</div>
+      <div class="stat-sub">with logged volume</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Volume</div>
+      <div class="stat-value" style="font-size:28px;">${(totalVol / 1000).toFixed(1)}<span style="font-size:14px;color:var(--muted);">t</span></div>
+      <div class="stat-sub">all-time tonnage</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg / Session</div>
+      <div class="stat-value" style="font-size:28px;">${avgVol.toLocaleString()}<span style="font-size:14px;color:var(--muted);">kg</span></div>
+      <div class="stat-sub">per workout</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Trend</div>
+      <div class="stat-value" style="font-size:28px;color:${change >= 0 ? 'var(--accent)' : 'var(--accent3)'};">${change >= 0 ? '+' : ''}${change.toFixed(1)}%</div>
+      <div class="stat-sub">first vs latest session</div>
+    </div>
+  `;
+}
+
+function setProgressEx(name) {
+  progressEx = name;
+  save('progressEx', name);
+  renderProgress();
+}
+
+function drawVolumeChart(points) {
+  const canvas = document.getElementById('progress-chart');
+  const ctx = canvas.getContext('2d');
+  const labels = points.map(p => new Date(p.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
+  const volumes = points.map(p => p.volume);
+
+  if (progressChartInstance) progressChartInstance.destroy();
+
+  progressChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Session Volume (kg)',
+        data: volumes,
+        backgroundColor: '#c8f13570',
+        borderColor: '#c8f135',
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#e8e8f0', font: { family: "'DM Sans', sans-serif", size: 11 } } },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        x: { ticks: { color: '#6b6b85', font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: '#6b6b85', font: { size: 10 } }, grid: { color: '#2a2a3840' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function drawProgressChart(points) {
+  const canvas = document.getElementById('progress-chart');
+  const ctx = canvas.getContext('2d');
+  const labels = points.map(p => new Date(p.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
+  const weights = points.map(p => p.weight);
+  const est1rms = points.map(p => p.est1rm);
+
+  if (progressChartInstance) progressChartInstance.destroy();
+
+  progressChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Top Set Weight (kg)',
+          data: weights,
+          borderColor: '#c8f135',
+          backgroundColor: '#c8f13520',
+          tension: 0.3,
+          fill: true,
+          pointRadius: 4,
+          pointBackgroundColor: '#c8f135',
+        },
+        {
+          label: 'Est. 1RM (kg)',
+          data: est1rms,
+          borderColor: '#4fffff',
+          backgroundColor: 'transparent',
+          borderDash: [5, 4],
+          tension: 0.3,
+          pointRadius: 3,
+          pointBackgroundColor: '#4fffff',
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#e8e8f0', font: { family: "'DM Sans', sans-serif", size: 11 } } },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        x: { ticks: { color: '#6b6b85', font: { size: 10 } }, grid: { color: '#2a2a3840' } },
+        y: { ticks: { color: '#6b6b85', font: { size: 10 } }, grid: { color: '#2a2a3840' }, beginAtZero: false }
+      }
+    }
+  });
 }
 
 // ===================== PLAN =====================
