@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Big Boy Plan — Workout Tracker</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0a0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Workout">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
@@ -1236,6 +1244,13 @@
   </div>
 
   <div class="plan-card" style="padding:20px;margin-bottom:16px;">
+    <div class="plan-day-name" style="margin-bottom:10px;">Rest Timer Notifications</div>
+    <div class="plan-focus" style="margin-bottom:14px;">Lets the rest timer alert you with your phone's notification sound + vibration even if you've switched apps or your screen is locked (Android; more limited on iOS Safari).</div>
+    <button class="modal-btn primary" style="flex:0 0 auto;padding:10px 18px;" onclick="enableRestNotifications()">Enable Notifications</button>
+    <div class="no-pr" style="margin-top:10px;" id="settings-notify-status"></div>
+  </div>
+
+  <div class="plan-card" style="padding:20px;margin-bottom:16px;">
     <div class="plan-day-name" style="margin-bottom:10px;">Body Weight</div>
     <div class="plan-focus" style="margin-bottom:14px;">Used to show your lifts as a ratio of bodyweight in PRs and Progress.</div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -1488,6 +1503,30 @@ function renderSettings() {
       <button class="filter-chip ${weightUnit === u ? 'active' : ''}" onclick="setWeightUnit('${u}')">${u.toUpperCase()}</button>
     `).join('');
   }
+
+  const notifyStatus = document.getElementById('settings-notify-status');
+  if (notifyStatus) {
+    if (!('Notification' in window)) {
+      notifyStatus.textContent = 'Not supported in this browser';
+    } else if (Notification.permission === 'granted') {
+      notifyStatus.textContent = '✓ Enabled';
+    } else if (Notification.permission === 'denied') {
+      notifyStatus.textContent = 'Blocked — re-enable it in your browser/site settings';
+    } else {
+      notifyStatus.textContent = 'Not enabled yet';
+    }
+  }
+}
+
+function enableRestNotifications() {
+  if (!('Notification' in window)) { toast('Notifications aren\'t supported in this browser'); return; }
+  Notification.requestPermission().then(() => {
+    notifyPermissionAsked = true;
+    save('notifyPermissionAsked', true);
+    renderSettings();
+    if (Notification.permission === 'granted') toast('Notifications enabled ✓');
+    else toast('Notifications not granted — check browser settings');
+  });
 }
 
 function convertFromKg(val) {
@@ -2547,10 +2586,15 @@ function toast(msg) {
 }
 
 // ===================== REST TIMER =====================
+// Uses a real end-timestamp (not a naive tick counter) so the countdown
+// stays accurate even if the browser throttles JS timers while the tab
+// is backgrounded or the screen is locked.
 let restTimerSeconds = 90;
 let restTimerRemaining = 90;
+let restTimerEndAt = null;      // Date.now() timestamp the timer finishes at
 let restTimerInterval = null;
 let restTimerRunning = false;
+let notifyPermissionAsked = load('notifyPermissionAsked', false);
 
 function formatRestTime(sec) {
   const m = Math.floor(sec / 60);
@@ -2569,6 +2613,7 @@ function updateRestTimerDisplay() {
 function setRestTimer(sec) {
   restTimerSeconds = sec;
   restTimerRemaining = sec;
+  restTimerEndAt = null;
   clearInterval(restTimerInterval);
   restTimerRunning = false;
   const startBtn = document.getElementById('rest-timer-start-btn');
@@ -2581,6 +2626,9 @@ function setRestTimer(sec) {
 
 function toggleRestTimerRun() {
   if (restTimerRunning) {
+    // Pause: snapshot the true remaining time from the end-timestamp
+    restTimerRemaining = Math.max(0, Math.round((restTimerEndAt - Date.now()) / 1000));
+    restTimerEndAt = null;
     clearInterval(restTimerInterval);
     restTimerRunning = false;
     document.getElementById('rest-timer-start-btn').textContent = 'Resume';
@@ -2592,29 +2640,45 @@ function toggleRestTimerRun() {
 
 function startRestTimer() {
   if (restTimerRemaining <= 0) restTimerRemaining = restTimerSeconds;
+  maybeRequestNotifyPermission();
   clearInterval(restTimerInterval);
   restTimerRunning = true;
+  restTimerEndAt = Date.now() + restTimerRemaining * 1000;
   const startBtn = document.getElementById('rest-timer-start-btn');
   if (startBtn) startBtn.textContent = 'Pause';
   document.getElementById('rest-timer-panel').classList.add('open');
   updateRestTimerDisplay();
-  restTimerInterval = setInterval(() => {
-    restTimerRemaining--;
-    if (restTimerRemaining <= 0) {
-      clearInterval(restTimerInterval);
-      restTimerRunning = false;
-      restTimerRemaining = 0;
-      updateRestTimerDisplay();
-      onRestTimerComplete();
-      return;
-    }
-    updateRestTimerDisplay();
-  }, 1000);
+  restTimerInterval = setInterval(tickRestTimer, 250);
 }
+
+function tickRestTimer() {
+  if (!restTimerRunning || restTimerEndAt === null) return;
+  const remaining = Math.round((restTimerEndAt - Date.now()) / 1000);
+  if (remaining <= 0) {
+    clearInterval(restTimerInterval);
+    restTimerRunning = false;
+    restTimerRemaining = 0;
+    restTimerEndAt = null;
+    updateRestTimerDisplay();
+    onRestTimerComplete();
+    return;
+  }
+  if (remaining !== restTimerRemaining) {
+    restTimerRemaining = remaining;
+    updateRestTimerDisplay();
+  }
+}
+
+// Catches the case where the tab was fully backgrounded/suspended and the
+// interval didn't get to fire right at zero — re-check as soon as it's visible again.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && restTimerRunning) tickRestTimer();
+});
 
 function resetRestTimer() {
   clearInterval(restTimerInterval);
   restTimerRunning = false;
+  restTimerEndAt = null;
   restTimerRemaining = restTimerSeconds;
   const startBtn = document.getElementById('rest-timer-start-btn');
   if (startBtn) startBtn.textContent = 'Start';
@@ -2625,10 +2689,20 @@ function toggleRestTimerPanel() {
   document.getElementById('rest-timer-panel').classList.toggle('open');
 }
 
+function maybeRequestNotifyPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default' && !notifyPermissionAsked) {
+    notifyPermissionAsked = true;
+    save('notifyPermissionAsked', true);
+    Notification.requestPermission().catch(() => {});
+  }
+}
+
 function onRestTimerComplete() {
   toast('⏱ Rest complete — go again!');
   if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
   playRestBeep();
+  fireRestNotification();
   const widget = document.getElementById('rest-timer-widget');
   widget.classList.add('flash');
   setTimeout(() => widget.classList.remove('flash'), 1600);
@@ -2652,7 +2726,38 @@ function playRestBeep() {
   } catch (e) { /* WebAudio unavailable — silently skip the beep */ }
 }
 
+// Fires a system-level notification (works even if the app/tab isn't in the
+// foreground) so you can hear the device's notification sound + feel it
+// vibrate through a locked screen — not just an in-page beep.
+function fireRestNotification() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const payload = {
+    body: 'Time to lift again 💪',
+    icon: 'icon-192.png',
+    badge: 'icon-192.png',
+    vibrate: [200, 100, 200],
+    tag: 'rest-timer',
+    renotify: true,
+  };
+  if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+    navigator.serviceWorker.ready
+      .then((reg) => reg.showNotification('⏱ Rest complete', payload))
+      .catch(() => { try { new Notification('⏱ Rest complete', payload); } catch (e) {} });
+  } else {
+    try { new Notification('⏱ Rest complete', payload); } catch (e) {}
+  }
+}
+
 updateRestTimerDisplay();
+
+// ===================== PWA SETUP =====================
+if (navigator.serviceWorker) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {
+      // Fails silently if sw.js isn't hosted alongside index.html yet
+    });
+  });
+}
 
 // ===================== MODAL =====================
 function closeModal() {
