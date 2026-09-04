@@ -309,6 +309,119 @@
     transition: border-color 0.15s;
   }
 
+  .weight-input-wrap { position: relative; }
+  .weight-input-wrap .set-input { padding-right: 40px; }
+
+  .lb-convert-btn {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 8.5px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    padding: 3px 5px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--surface2, var(--card));
+    color: var(--muted);
+    cursor: pointer;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .lb-convert-btn:hover { color: var(--accent2); border-color: #4fffff60; }
+  .lb-convert-btn:active { background: var(--accent2); color: var(--bg); }
+
+  /* REST TIMER */
+  .rest-timer-widget {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+  }
+
+  .rest-timer-fab {
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .rest-timer-widget.flash .rest-timer-fab {
+    animation: rest-flash 0.5s ease-in-out 3;
+  }
+
+  @keyframes rest-flash {
+    0%, 100% { background: var(--accent); }
+    50% { background: var(--accent2); }
+  }
+
+  .rest-timer-panel {
+    display: none;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    width: 220px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+
+  .rest-timer-panel.open { display: block; }
+
+  .rest-timer-display {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 40px;
+    letter-spacing: 2px;
+    text-align: center;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .rest-timer-presets {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .rest-timer-presets button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 0;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    cursor: pointer;
+  }
+
+  .rest-timer-presets button.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    font-weight: 700;
+  }
+
+  .rest-timer-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
   .set-input:focus { border-color: var(--accent); }
   .set-input::placeholder { color: var(--muted); font-size: 11px; }
 
@@ -1110,6 +1223,19 @@
   <div class="section-sub">Backup, restore & preferences</div>
 
   <div class="plan-card" style="padding:20px;margin-bottom:16px;">
+    <div class="plan-day-name" style="margin-bottom:10px;">Weight Unit</div>
+    <div class="plan-focus" style="margin-bottom:14px;">Choose the unit used when logging sets on the Today page. Everything is stored in kg internally, so switching units never changes your saved history or PRs.</div>
+    <div class="filter-row" id="settings-unit-toggle" style="margin-bottom:16px;"></div>
+
+    <div class="plan-day-name" style="margin:16px 0 8px;font-size:14px;">Quick Converter</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <input class="modal-input" id="conv-kg" type="number" step="0.1" placeholder="kg" style="margin-bottom:0;max-width:120px;" oninput="convertFromKg(this.value)">
+      <span style="color:var(--muted);font-size:13px;">=</span>
+      <input class="modal-input" id="conv-lbs" type="number" step="0.1" placeholder="lbs" style="margin-bottom:0;max-width:120px;" oninput="convertFromLbs(this.value)">
+    </div>
+  </div>
+
+  <div class="plan-card" style="padding:20px;margin-bottom:16px;">
     <div class="plan-day-name" style="margin-bottom:10px;">Body Weight</div>
     <div class="plan-focus" style="margin-bottom:14px;">Used to show your lifts as a ratio of bodyweight in PRs and Progress.</div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
@@ -1141,7 +1267,7 @@
 <!-- ADD EXERCISE MODAL -->
 <div class="modal-overlay" id="add-ex-modal" onclick="closeAddExercise()">
   <div class="modal" style="max-width:400px;" onclick="event.stopPropagation()">
-    <div class="modal-title">Add Exercise</div>
+    <div class="modal-title" id="add-ex-modal-title">Add Exercise</div>
     <div class="modal-sub" id="add-ex-day-name"></div>
     <input class="modal-input" id="add-ex-name" type="text" placeholder="Exercise name (e.g. Pull Ups)">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -1151,7 +1277,20 @@
     <div style="height:12px;"></div>
     <div class="modal-btns">
       <button class="modal-btn" onclick="closeAddExercise()">Cancel</button>
-      <button class="modal-btn primary" onclick="confirmAddExercise()">Add</button>
+      <button class="modal-btn primary" onclick="confirmAddExercise()" id="add-ex-confirm-btn">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT WORKOUT MODAL -->
+<div class="modal-overlay" id="edit-workout-modal" onclick="closeEditWorkout(event)">
+  <div class="modal" style="max-width:440px;max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
+    <div class="modal-title" id="edit-workout-title">Edit Workout</div>
+    <div class="modal-sub" id="edit-workout-sub"></div>
+    <div id="edit-workout-body"></div>
+    <div class="modal-btns" style="margin-top:14px;">
+      <button class="modal-btn" onclick="closeEditWorkout()">Cancel</button>
+      <button class="modal-btn primary" onclick="saveEditWorkout()">Save Changes</button>
     </div>
   </div>
 </div>
@@ -1171,6 +1310,24 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- REST TIMER -->
+<div class="rest-timer-widget" id="rest-timer-widget">
+  <div class="rest-timer-panel" id="rest-timer-panel">
+    <div class="rest-timer-display" id="rest-timer-display">01:30</div>
+    <div class="rest-timer-presets" id="rest-timer-presets">
+      <button onclick="setRestTimer(60)" data-preset="60">60s</button>
+      <button onclick="setRestTimer(90)" data-preset="90" class="active">90s</button>
+      <button onclick="setRestTimer(120)" data-preset="120">120s</button>
+      <button onclick="setRestTimer(180)" data-preset="180">180s</button>
+    </div>
+    <div class="rest-timer-controls">
+      <button class="modal-btn" onclick="resetRestTimer()">Reset</button>
+      <button class="modal-btn primary" onclick="toggleRestTimerRun()" id="rest-timer-start-btn">Start</button>
+    </div>
+  </div>
+  <button class="rest-timer-fab" onclick="toggleRestTimerPanel()">⏱ <span id="rest-timer-fab-time"></span></button>
+</div>
 
 <script>
 // ===================== DATA =====================
@@ -1285,6 +1442,27 @@ function localDateKey(d) {
 
 function getCurrentBodyweight() { return load('bodyweight', null); }
 
+// ===================== UNITS =====================
+let weightUnit = load('weightUnit', 'kg'); // 'kg' | 'lbs' — canonical storage is always kg
+function kgToLbs(kg) { return Math.round(kg * 2.20462 * 100) / 100; }
+function lbsToKg(lbs) { return Math.round((lbs / 2.20462) * 100) / 100; }
+function toDisplayWeight(kg) {
+  if (kg === '' || kg === null || kg === undefined || isNaN(kg)) return '';
+  const n = parseFloat(kg);
+  return weightUnit === 'lbs' ? kgToLbs(n) : Math.round(n * 100) / 100;
+}
+function fromDisplayWeight(val) {
+  if (val === '' || val === null || val === undefined || isNaN(val)) return '';
+  const n = parseFloat(val);
+  return weightUnit === 'lbs' ? lbsToKg(n) : Math.round(n * 100) / 100;
+}
+function setWeightUnit(unit) {
+  weightUnit = unit;
+  save('weightUnit', unit);
+  renderSettings();
+  if (document.getElementById('page-today').classList.contains('active')) renderToday();
+}
+
 function getLastSession(name) {
   const history = load('history', []);
   const sorted = [...history].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -1303,6 +1481,25 @@ function renderSettings() {
   const bw = getCurrentBodyweight();
   document.getElementById('settings-bw-current').textContent =
     bw ? `Current: ${bw}kg` : 'No body weight logged yet';
+
+  const unitToggle = document.getElementById('settings-unit-toggle');
+  if (unitToggle) {
+    unitToggle.innerHTML = ['kg', 'lbs'].map(u => `
+      <button class="filter-chip ${weightUnit === u ? 'active' : ''}" onclick="setWeightUnit('${u}')">${u.toUpperCase()}</button>
+    `).join('');
+  }
+}
+
+function convertFromKg(val) {
+  const lbsInput = document.getElementById('conv-lbs');
+  if (val === '' || isNaN(val)) { lbsInput.value = ''; return; }
+  lbsInput.value = kgToLbs(parseFloat(val));
+}
+
+function convertFromLbs(val) {
+  const kgInput = document.getElementById('conv-kg');
+  if (val === '' || isNaN(val)) { kgInput.value = ''; return; }
+  kgInput.value = lbsToKg(parseFloat(val));
 }
 
 function saveBodyweight() {
@@ -1438,9 +1635,9 @@ function renderToday() {
 
   list.innerHTML = day.exercises.map((ex, ei) => {
     const pr = getPR(ex.name);
-    const prHint = pr ? `<div class="pr-hint">🏆 PR: ${pr.weight}kg × ${pr.reps} reps</div>` : '';
+    const prHint = pr ? `<div class="pr-hint">🏆 PR: ${toDisplayWeight(pr.weight)}${weightUnit} × ${pr.reps} reps</div>` : '';
     const last = getLastSession(ex.name);
-    const lastHint = last ? `<div class="pr-hint" style="color:var(--accent2);border-color:#4fffff30;background:#4fffff10;">⏱ Last: ${last.sets.map(s => `${s.weight}×${s.reps}`).join(', ')}</div>` : '';
+    const lastHint = last ? `<div class="pr-hint" style="color:var(--accent2);border-color:#4fffff30;background:#4fffff10;">⏱ Last: ${last.sets.map(s => `${toDisplayWeight(s.weight)}×${s.reps}`).join(', ')}</div>` : '';
     const setsHTML = buildSetsHTML(ex, ei, last);
     return `
       <div class="exercise-card" id="ex-card-${ei}">
@@ -1457,7 +1654,7 @@ function renderToday() {
           ${lastHint}
           <div class="set-labels">
             <div class="set-label">#</div>
-            <div class="set-label">Weight (kg)</div>
+            <div class="set-label">Weight (${weightUnit})</div>
             <div class="set-label">Reps</div>
             <div class="set-label">✓</div>
           </div>
@@ -1471,13 +1668,17 @@ function buildSetsHTML(ex, ei, last) {
   if (!setData[ei]) setData[ei] = Array.from({length: ex.sets}, () => ({ weight: '', reps: '', done: false }));
   return setData[ei].map((s, si) => {
     const lastSet = last && last.sets[si];
-    const wPlaceholder = lastSet ? lastSet.weight : 'kg';
+    const wPlaceholder = lastSet ? toDisplayWeight(lastSet.weight) : weightUnit;
     const rPlaceholder = lastSet ? lastSet.reps : 'reps';
+    const displayWeight = s.weight === '' ? '' : toDisplayWeight(s.weight);
     return `
     <div class="set-row">
       <div class="set-num">${si+1}</div>
-      <input class="set-input" type="number" placeholder="${wPlaceholder}" step="0.5" value="${s.weight}"
-        onchange="updateSet(${ei},${si},'weight',this.value)">
+      <div class="weight-input-wrap">
+        <input class="set-input" type="number" placeholder="${wPlaceholder}" step="0.5" value="${displayWeight}"
+          onchange="updateSet(${ei},${si},'weight',this.value)" id="wt-${ei}-${si}">
+        <button type="button" class="lb-convert-btn" onclick="convertSetToKg(${ei},${si})" title="Typed a lbs number? Tap to convert it to kg in place">lb→kg</button>
+      </div>
       <input class="set-input" type="number" placeholder="${rPlaceholder}" value="${s.reps}"
         onchange="updateSet(${ei},${si},'reps',this.value)">
       <button class="set-done ${s.done?'done':''}" onclick="toggleSetDone(${ei},${si})" title="Mark done">✓</button>
@@ -1492,7 +1693,24 @@ function toggleEx(ei) {
 
 function updateSet(ei, si, field, val) {
   if (!setData[ei]) return;
-  setData[ei][si][field] = val;
+  // Weight is always stored in kg internally, regardless of the display unit,
+  // so history/PRs/progress stay consistent even if the unit is switched later.
+  setData[ei][si][field] = field === 'weight' ? fromDisplayWeight(val) : val;
+}
+
+// Quick per-field lbs->kg convert: reads whatever number is currently typed
+// in a weight box, treats it as lbs, and replaces it with the kg equivalent
+// (or the equivalent in the current display unit, if that's ever lbs too).
+function convertSetToKg(ei, si) {
+  const input = document.getElementById(`wt-${ei}-${si}`);
+  if (!input) return;
+  const typedLbs = parseFloat(input.value);
+  if (!typedLbs || isNaN(typedLbs)) { toast('Type the lbs number first'); return; }
+  const kgVal = lbsToKg(typedLbs);
+  const displayVal = weightUnit === 'lbs' ? kgToLbs(kgVal) : kgVal;
+  input.value = displayVal;
+  updateSet(ei, si, 'weight', displayVal);
+  toast(`${typedLbs}lbs ≈ ${kgVal}kg`);
 }
 
 function toggleSetDone(ei, si) {
@@ -1501,6 +1719,11 @@ function toggleSetDone(ei, si) {
   const btn = document.querySelector(`#ex-card-${ei} .sets-panel .set-row:nth-child(${si + 3}) .set-done`);
   if (btn) btn.classList.toggle('done');
   checkAllSets(ei);
+  // Auto-start the rest timer whenever a set is freshly marked done
+  if (setData[ei][si].done) {
+    resetRestTimer();
+    startRestTimer();
+  }
 }
 
 function checkAllSets(ei) {
@@ -1647,6 +1870,7 @@ function renderHistory() {
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
             <span class="day-tag ${tag.cls}">${tag.label}</span>
+            <button class="plan-remove-btn" style="background:#4fffff18;border-color:#4fffff35;color:var(--accent2);" onclick="openEditWorkout(${w.id})" title="Edit">✎</button>
             <button class="delete-btn" onclick="deleteWorkout(${w.id})" title="Delete">✕</button>
           </div>
         </div>
@@ -1667,6 +1891,72 @@ function deleteWorkout(id) {
   save('history', history);
   renderHistory();
   toast('Workout deleted');
+}
+
+let editingWorkoutId = null;
+
+function openEditWorkout(id) {
+  const history = load('history', []);
+  const w = history.find(x => x.id === id);
+  if (!w) return;
+  editingWorkoutId = id;
+  document.getElementById('edit-workout-title').textContent = w.dayName;
+  document.getElementById('edit-workout-sub').textContent =
+    new Date(w.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+  document.getElementById('edit-workout-body').innerHTML = w.exercises.map((e, ei) => `
+    <div class="plan-day-name" style="font-size:14px;margin:14px 0 6px;">${e.name}</div>
+    <div class="set-labels">
+      <div class="set-label">#</div>
+      <div class="set-label">Weight (${weightUnit})</div>
+      <div class="set-label">Reps</div>
+    </div>
+    ${e.sets.map((s, si) => `
+      <div class="set-row" style="grid-template-columns: 28px 1fr 1fr;">
+        <div class="set-num">${si + 1}</div>
+        <input class="set-input" type="number" step="0.5" value="${toDisplayWeight(s.weight)}" id="edit-w-${ei}-${si}">
+        <input class="set-input" type="number" value="${s.reps}" id="edit-r-${ei}-${si}">
+      </div>`).join('')}
+  `).join('');
+  document.getElementById('edit-workout-modal').classList.add('open');
+}
+
+function closeEditWorkout() {
+  document.getElementById('edit-workout-modal').classList.remove('open');
+  editingWorkoutId = null;
+}
+
+function saveEditWorkout() {
+  const history = load('history', []);
+  const idx = history.findIndex(x => x.id === editingWorkoutId);
+  if (idx === -1) return;
+  const w = history[idx];
+
+  w.exercises.forEach((e, ei) => {
+    e.sets.forEach((s, si) => {
+      const wInput = document.getElementById(`edit-w-${ei}-${si}`);
+      const rInput = document.getElementById(`edit-r-${ei}-${si}`);
+      if (wInput && wInput.value !== '') s.weight = fromDisplayWeight(wInput.value);
+      if (rInput && rInput.value !== '') s.reps = rInput.value;
+    });
+    // Re-check PRs against the edited values (promotions only — this won't
+    // demote an existing PR if you lower the number that originally set it)
+    e.sets.forEach(s => {
+      const wt = parseFloat(s.weight);
+      const rp = parseInt(s.reps);
+      if (!isNaN(wt) && !isNaN(rp)) {
+        const cur = getPR(e.name);
+        if (!cur || wt > cur.weight || (wt === cur.weight && rp > cur.reps)) {
+          setPR(e.name, { weight: wt, reps: rp, date: w.date });
+        }
+      }
+    });
+  });
+
+  history[idx] = w;
+  save('history', history);
+  closeEditWorkout();
+  renderHistory();
+  toast('Workout updated');
 }
 
 // ===================== STATS =====================
@@ -2166,6 +2456,7 @@ function renderPlan() {
               <div class="plan-ex">
                 <span class="plan-ex-name">${ex.name}</span>
                 <span class="plan-ex-sets">${ex.sets}×${ex.reps}</span>
+                <button class="plan-remove-btn" style="background:#4fffff18;border-color:#4fffff35;color:var(--accent2);" onclick="openEditExercise(${i},${ei})" title="Edit">✎</button>
                 <button class="plan-remove-btn" onclick="removeExercise(${i},${ei})" title="Remove">✕</button>
               </div>`).join('')}
         </div>
@@ -2174,11 +2465,15 @@ function renderPlan() {
 }
 
 let editingDayIndex = null;
+let editingExIndex = null; // null = adding new, number = editing existing
 
 function openAddExercise(dayIndex) {
   editingDayIndex = dayIndex;
+  editingExIndex = null;
   const plan = getActivePlan();
   const day = plan[dayIndex];
+  document.getElementById('add-ex-modal-title').textContent = 'Add Exercise';
+  document.getElementById('add-ex-confirm-btn').textContent = 'Add';
   document.getElementById('add-ex-day-name').textContent = day.name;
   document.getElementById('add-ex-name').value = '';
   document.getElementById('add-ex-sets').value = '';
@@ -2187,9 +2482,26 @@ function openAddExercise(dayIndex) {
   setTimeout(() => document.getElementById('add-ex-name').focus(), 100);
 }
 
+function openEditExercise(dayIndex, exIndex) {
+  editingDayIndex = dayIndex;
+  editingExIndex = exIndex;
+  const plan = getActivePlan();
+  const day = plan[dayIndex];
+  const ex = day.exercises[exIndex];
+  document.getElementById('add-ex-modal-title').textContent = 'Edit Exercise';
+  document.getElementById('add-ex-confirm-btn').textContent = 'Save';
+  document.getElementById('add-ex-day-name').textContent = day.name;
+  document.getElementById('add-ex-name').value = ex.name;
+  document.getElementById('add-ex-sets').value = ex.sets;
+  document.getElementById('add-ex-reps').value = ex.reps;
+  document.getElementById('add-ex-modal').classList.add('open');
+  setTimeout(() => document.getElementById('add-ex-name').focus(), 100);
+}
+
 function closeAddExercise() {
   document.getElementById('add-ex-modal').classList.remove('open');
   editingDayIndex = null;
+  editingExIndex = null;
 }
 
 function confirmAddExercise() {
@@ -2202,13 +2514,19 @@ function confirmAddExercise() {
   if (!reps) { document.getElementById('add-ex-reps').focus(); return; }
 
   const plan = JSON.parse(JSON.stringify(getActivePlan()));
-  plan[editingDayIndex].exercises.push({ name, sets, reps });
+  if (editingExIndex !== null) {
+    plan[editingDayIndex].exercises[editingExIndex] = { name, sets, reps };
+  } else {
+    plan[editingDayIndex].exercises.push({ name, sets, reps });
+  }
   saveCustomPlan(plan);
+  const wasEditing = editingExIndex !== null;
+  const dayIndex = editingDayIndex;
   closeAddExercise();
   renderPlan();
   // Also re-render today if same day is selected
-  if (editingDayIndex === currentDay) renderToday();
-  toast(`Added: ${name}`);
+  if (dayIndex === currentDay) renderToday();
+  toast(wasEditing ? `Updated: ${name}` : `Added: ${name}`);
 }
 
 function removeExercise(dayIndex, exIndex) {
@@ -2227,6 +2545,114 @@ function toast(msg) {
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
 }
+
+// ===================== REST TIMER =====================
+let restTimerSeconds = 90;
+let restTimerRemaining = 90;
+let restTimerInterval = null;
+let restTimerRunning = false;
+
+function formatRestTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function updateRestTimerDisplay() {
+  const str = formatRestTime(restTimerRemaining);
+  const displayEl = document.getElementById('rest-timer-display');
+  if (displayEl) displayEl.textContent = str;
+  const fabEl = document.getElementById('rest-timer-fab-time');
+  if (fabEl) fabEl.textContent = restTimerRunning ? str : '';
+}
+
+function setRestTimer(sec) {
+  restTimerSeconds = sec;
+  restTimerRemaining = sec;
+  clearInterval(restTimerInterval);
+  restTimerRunning = false;
+  const startBtn = document.getElementById('rest-timer-start-btn');
+  if (startBtn) startBtn.textContent = 'Start';
+  document.querySelectorAll('#rest-timer-presets button').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.preset) === sec);
+  });
+  updateRestTimerDisplay();
+}
+
+function toggleRestTimerRun() {
+  if (restTimerRunning) {
+    clearInterval(restTimerInterval);
+    restTimerRunning = false;
+    document.getElementById('rest-timer-start-btn').textContent = 'Resume';
+    updateRestTimerDisplay();
+    return;
+  }
+  startRestTimer();
+}
+
+function startRestTimer() {
+  if (restTimerRemaining <= 0) restTimerRemaining = restTimerSeconds;
+  clearInterval(restTimerInterval);
+  restTimerRunning = true;
+  const startBtn = document.getElementById('rest-timer-start-btn');
+  if (startBtn) startBtn.textContent = 'Pause';
+  document.getElementById('rest-timer-panel').classList.add('open');
+  updateRestTimerDisplay();
+  restTimerInterval = setInterval(() => {
+    restTimerRemaining--;
+    if (restTimerRemaining <= 0) {
+      clearInterval(restTimerInterval);
+      restTimerRunning = false;
+      restTimerRemaining = 0;
+      updateRestTimerDisplay();
+      onRestTimerComplete();
+      return;
+    }
+    updateRestTimerDisplay();
+  }, 1000);
+}
+
+function resetRestTimer() {
+  clearInterval(restTimerInterval);
+  restTimerRunning = false;
+  restTimerRemaining = restTimerSeconds;
+  const startBtn = document.getElementById('rest-timer-start-btn');
+  if (startBtn) startBtn.textContent = 'Start';
+  updateRestTimerDisplay();
+}
+
+function toggleRestTimerPanel() {
+  document.getElementById('rest-timer-panel').classList.toggle('open');
+}
+
+function onRestTimerComplete() {
+  toast('⏱ Rest complete — go again!');
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  playRestBeep();
+  const widget = document.getElementById('rest-timer-widget');
+  widget.classList.add('flash');
+  setTimeout(() => widget.classList.remove('flash'), 1600);
+}
+
+function playRestBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.4].forEach(delay => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.001, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.3);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.32);
+    });
+  } catch (e) { /* WebAudio unavailable — silently skip the beep */ }
+}
+
+updateRestTimerDisplay();
 
 // ===================== MODAL =====================
 function closeModal() {
