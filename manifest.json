@@ -1,7 +1,7 @@
 {
   "name": "Workout Tracker",
   "short_name": "Workout",
-  "description": "Pull / Push / Legs / Upper split tracker with progress charts, PRs, and a rest timer.",
+  "description": "Custom workout plans, gym and home templates, flexible sets, progress graphs, personal records and a rest timer.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
