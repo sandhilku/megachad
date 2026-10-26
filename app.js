@@ -209,7 +209,7 @@ function saveBodyweight() {
 
 function exportData() {
   const drafts=getDrafts(),day=getActivePlan()[currentDay];drafts[day.id]=Object.fromEntries(day.exercises.map((e,i)=>[e.id,copy(setData[i]||[])]));
-  const data={version:2,exportedAt:new Date().toISOString(),history:load('history',[]),prs:load('prs',{}),customPlan:getActivePlan(),planName:load('planName','Big Boy Plan'),bodyweight:load('bodyweight',null),bodyweightLog:load('bodyweightLog',[]),weightUnit,currentDay,workoutDrafts:drafts};
+  const data={version:3,exportedAt:new Date().toISOString(),weeklyGoals:readWeeklyGoals(),history:load('history',[]),prs:load('prs',{}),customPlan:getActivePlan(),planName:load('planName','Big Boy Plan'),bodyweight:load('bodyweight',null),bodyweightLog:load('bodyweightLog',[]),weightUnit,currentDay,workoutDrafts:drafts};
   const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=`workout-backup-${localDateKey(new Date())}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Backup exported');
 }
 
@@ -303,7 +303,7 @@ function renderToday() {
           <button type="button" class="ex-check" aria-label="Mark exercise complete" onclick="event.stopPropagation();markDone(${ei})"></button>
           <div class="ex-info">
             <div class="ex-name">${h(ex.name)}</div>
-            <div class="ex-sets">${ex.sets} sets × ${h(ex.reps)}</div><div class="today-set-controls"><button onclick="event.stopPropagation();setExerciseCount(currentDay,${ei},${ex.sets}-1)" ${ex.sets===1?'disabled':''} aria-label="Remove one set">− set</button><button onclick="event.stopPropagation();setExerciseCount(currentDay,${ei},${ex.sets}+1)" aria-label="Add one set">＋ set</button></div>
+            <div class="ex-sets">${ex.sets} sets × ${h(ex.reps)}</div>
           </div>
           <button type="button" class="ex-toggle" aria-label="Expand or collapse sets" onclick="event.stopPropagation();toggleEx(${ei})">⌄</button>
         </div>
@@ -394,7 +394,7 @@ function saveWorkout() {
   const exercises=day.exercises.map((e,i)=>({name:e.name,sets:(setData[i]||[]).filter(s=>s.done&&validSet(s)).map(s=>({weight:Number(s.weight),reps:Number(s.reps),done:true}))})).filter(e=>e.sets.length);
   if(!exercises.length){toast('Complete at least one valid set, then save');return;}
   const history=load('history',[]),id=Math.max(Date.now(),...history.map(w=>w.id+1));
-  history.unshift({id,date:new Date().toISOString(),planName:load('planName','Big Boy Plan'),dayIndex:currentDay,dayName:day.name,type:day.type,exercises});
+  syncWeeklyGoal();history.unshift({id,date:new Date().toISOString(),planName:load('planName','Big Boy Plan'),weeklyTarget:getWeeklyTarget(),dayIndex:currentDay,dayName:day.name,type:day.type,exercises});
   save('history',history);recomputePRs();const drafts=getDrafts();delete drafts[day.id];save('workoutDrafts',drafts);setData={};renderToday();toast('Workout saved — completed sets logged');
 }
 
@@ -522,16 +522,7 @@ function renderStats() {
   history.forEach(w => { typeCounts[w.type] = (typeCounts[w.type]||0)+1; });
   const fav = Object.entries(typeCounts).sort((a,b)=>b[1]-a[1])[0];
 
-  // Streak (local-timezone-safe: avoids UTC off-by-one at day boundaries)
-  let streak = 0;
-  const days = [...new Set(history.map(w => localDateKey(w.date)))].sort().reverse();
-  let checkDate = new Date();
-  checkDate.setHours(0, 0, 0, 0);
-  if(days.length && days[0]!==localDateKey(checkDate))checkDate.setDate(checkDate.getDate()-1);
-  for (const d of days) {
-    if (d === localDateKey(checkDate)) { streak++; checkDate.setDate(checkDate.getDate() - 1); }
-    else break;
-  }
+  const streak=getWeeklyStreak().streak;
 
   document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card">
@@ -555,9 +546,9 @@ function renderStats() {
       <div class="stat-sub">personal records</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Streak</div>
+      <div class="stat-label">Day Streak</div>
       <div class="stat-value">${streak}</div>
-      <div class="stat-sub">days in a row</div>
+      <div class="stat-sub">calendar days · rest included</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Fav Split</div>
@@ -618,12 +609,12 @@ function renderCalendar() {
     toggleBtn.textContent = 'View Full Year';
     monthView.style.display = 'block';
     yearView.style.display = 'none';
-    renderCalendarMonth();
+    renderCalendarMonth();renderWeeklyStreak();
   } else {
     toggleBtn.textContent = 'View Month';
     monthView.style.display = 'none';
     yearView.style.display = 'block';
-    renderCalendarYear();
+    renderCalendarYear();renderWeeklyStreak();
   }
 }
 
@@ -636,10 +627,10 @@ function renderCalendarMonth() {
     calendarDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
   const firstDay = new Date(year, month, 1);
-  const startOffset = firstDay.getDay(); // 0 = Sun
+  const startOffset = (firstDay.getDay()+6)%7; // 0 = Sun
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const todayStr = localDateKey(new Date());
-  const dowNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dowNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   let html = dowNames.map(d => `<div class="calendar-dow">${d}</div>`).join('');
   for (let i = 0; i < startOffset; i++) html += `<div class="calendar-day empty"></div>`;
@@ -658,7 +649,7 @@ function renderCalendarMonth() {
       dotsHtml = `<div class="calendar-dots">${types.map(t => `<span class="calendar-dot" style="background:${DOT_COLORS[t] || 'var(--muted)'}"></span>`).join('')}</div>`;
     }
     const title = trained ? workouts.map(w => w.dayName).join(', ') : 'No workout logged';
-    html += `<div class="calendar-day ${trained ? 'trained' : ''} ${isToday ? 'today' : ''}" title="${h(title)}">
+    html += `<div data-date="${dateStr}" class="calendar-day ${trained ? 'trained' : ''} ${isToday ? 'today' : ''}" title="${h(title)}">
       <div class="calendar-day-num">${day}</div>
       ${trained ? '<div class="calendar-check">✓</div>' : ''}
       ${dotsHtml}
@@ -686,7 +677,7 @@ function renderCalendarYear() {
   for (let month = 0; month < 12; month++) {
     const monthName = new Date(calendarYearView, month, 1).toLocaleDateString('en-GB', { month: 'long' });
     const firstDay = new Date(calendarYearView, month, 1);
-    const startOffset = firstDay.getDay();
+    const startOffset = (firstDay.getDay()+6)%7;
     const daysInMonth = new Date(calendarYearView, month + 1, 0).getDate();
     let monthTrained = 0;
     let cells = '';
@@ -698,7 +689,7 @@ function renderCalendarYear() {
       if (trained) monthTrained++;
       const isToday = dateStr === todayStr;
       const title = trained ? workouts.map(w => w.dayName).join(', ') : '';
-      cells += `<div class="mini-day ${trained ? 'trained' : ''} ${isToday ? 'today' : ''}" title="${h(title)}">${day}</div>`;
+      cells += `<div data-date="${dateStr}" class="mini-day ${trained ? 'trained' : ''} ${isToday ? 'today' : ''}" title="${h(title)}">${day}</div>`;
     }
     html += `
       <div class="mini-month">
@@ -776,7 +767,7 @@ function saveCustomPlan(plan) {
 }
 
 function renderPlan() {
-  updatePlanTitle();const plan=getActivePlan();
+  updatePlanTitle();syncWeeklyGoal();const plan=getActivePlan();
   document.getElementById('plan-grid').innerHTML=plan.map((d,di)=>`<article class="plan-card"><div class="plan-header"><div style="flex:1;min-width:0"><div class="plan-day-name">${h(d.name)}</div><div class="plan-focus">${h(d.focus)}</div><span class="day-tag ${TYPE_TAGS[d.type].cls}">${TYPE_TAGS[d.type].label}</span></div><button class="plan-edit-btn" onclick="openDayEditor(${di})" aria-label="Edit day ${di+1}">✎</button></div>
     <div class="plan-actions"><button onclick="moveDay(${di},-1)" ${di===0?'disabled':''} aria-label="Move day up">↑ Day</button><button onclick="moveDay(${di},1)" ${di===plan.length-1?'disabled':''} aria-label="Move day down">↓ Day</button><button onclick="duplicateDay(${di})">Duplicate</button><button onclick="removeDay(${di})" ${plan.length===1?'disabled':''}>Remove day</button><button onclick="openAddExercise(${di})">＋ Exercise</button></div>
     <div class="plan-exercises">${d.exercises.map((e,ei)=>`<div class="plan-ex customizable"><div class="plan-ex-name">${h(e.name)}<small>${h(e.reps)} reps${e.bodyweight?' · bodyweight':''}</small></div><label class="inline-set-label"><input type="number" class="inline-sets" min="1" max="100" step="1" aria-label="Sets for ${h(e.name)}" value="${e.sets}" onchange="setExerciseCount(${di},${ei},this.value)"> sets</label><div class="reorder-buttons"><button onclick="moveExercise(${di},${ei},-1)" ${ei===0?'disabled':''} aria-label="Move ${h(e.name)} up">↑</button><button onclick="moveExercise(${di},${ei},1)" ${ei===d.exercises.length-1?'disabled':''} aria-label="Move ${h(e.name)} down">↓</button><button onclick="openEditExercise(${di},${ei})" aria-label="Edit ${h(e.name)}">✎</button><button onclick="removeExercise(${di},${ei})" aria-label="Remove ${h(e.name)}">×</button></div></div>`).join('')||'<p class="empty-day">Recovery day, or add your first exercise.</p>'}</div></article>`).join('');
@@ -1102,6 +1093,17 @@ const PRESETS=[
 
 
 // Finish initialization only after definitions, data migration and preset setup.
+
+
+
+
+
+
+
+
+
+let streakDate=null;
+
 let editingWeightId=null;
 
 
@@ -1286,7 +1288,68 @@ function validateBackup(data) {
     }
     drafts[day.id]=rows;
   }
-  return {history,customPlan,planName:typeof data.planName==='string'&&data.planName.trim()?data.planName.trim().slice(0,120):'My Workout Plan',bodyweight:data.bodyweight==null?null:Number(data.bodyweight),bodyweightLog:log,weightUnit:['kg','lbs'].includes(data.weightUnit)?data.weightUnit:'kg',currentDay:Number.isInteger(data.currentDay)?Math.min(Math.max(data.currentDay,0),customPlan.length-1):0,workoutDrafts:drafts};
+  return {history,customPlan,weeklyGoals:validateWeeklyGoals(data.weeklyGoals??[]),planName:typeof data.planName==='string'&&data.planName.trim()?data.planName.trim().slice(0,120):'My Workout Plan',bodyweight:data.bodyweight==null?null:Number(data.bodyweight),bodyweightLog:log,weightUnit:['kg','lbs'].includes(data.weightUnit)?data.weightUnit:'kg',currentDay:Number.isInteger(data.currentDay)?Math.min(Math.max(data.currentDay,0),customPlan.length-1):0,workoutDrafts:drafts};
+}
+
+function weekKey(value) {
+  const date=typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)?new Date(value+'T12:00:00'):new Date(value);date.setHours(12,0,0,0);date.setDate(date.getDate()-(date.getDay()+6)%7);return localDateKey(date);
+}
+
+function shiftWeek(key,amount) {
+  const date=new Date(key+'T12:00:00');date.setDate(date.getDate()+7*amount);return localDateKey(date);
+}
+
+function getWeeklyTarget(plan=getActivePlan()) {
+  return Math.min(7,plan.filter(d=>d.type!=='rest'&&d.type!=='optional'&&d.exercises.length>0).length);
+}
+
+function validateWeeklyGoals(raw) {
+  if(!Array.isArray(raw)||raw.length>10000)throw Error('Invalid weekly goals');const seen=new Set();
+  return raw.map(g=>{if(!g||typeof g.week!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(g.week)||weekKey(g.week)!==g.week||!Number.isInteger(g.target)||g.target<0||g.target>7||seen.has(g.week))throw Error('Invalid weekly goal');seen.add(g.week);return {week:g.week,target:g.target};}).sort((a,b)=>a.week.localeCompare(b.week));
+}
+
+function readWeeklyGoals() {
+  try{return validateWeeklyGoals(load('weeklyGoals',[]));}catch{return [];}
+}
+
+function weeklyTargetAt(key,goals,fallback=getWeeklyTarget()) {
+  let target=goals[0]?.target??fallback;for(const g of goals){if(g.week>key)break;target=g.target;}return target;
+}
+
+function syncWeeklyGoal() {
+  const current=weekKey(new Date()),target=getWeeklyTarget(),goals=readWeeklyGoals();
+  if(!goals.length){const weeks=load('history',[]).filter(w=>localDateKey(w.date)<=localDateKey(new Date())).map(w=>weekKey(w.date)).sort();goals.push({week:weeks[0]||current,target});}
+  const existing=goals.find(g=>g.week===current);if(existing&&existing.target===target&&localStorage.getItem('weeklyGoals')!==null)return;
+  if(existing)existing.target=target;else goals.push({week:current,target});save('weeklyGoals',goals.sort((a,b)=>a.week.localeCompare(b.week)));
+}
+
+function getWeeklyStreak(history=load('history',[]),goals=readWeeklyGoals(),now=new Date()) {
+  const current=weekKey(now),today=localDateKey(now),buckets=new Map();
+  for(const w of history){const day=localDateKey(w.date);if(day>today||w.type==='rest'||!w.exercises.some(e=>e.sets.some(validSet)))continue;const key=weekKey(day);if(!buckets.has(key))buckets.set(key,new Set());buckets.get(key).add(day);}
+  const complete=new Set([...buckets].filter(([key,days])=>{const target=weeklyTargetAt(key,goals);return target>0&&days.size>=target;}).map(([key])=>key));
+  const elapsed=(now.getDay()+6)%7+1;
+  let best=0,run=0,previous=null;for(const key of [...complete].sort()){run=previous&&shiftWeek(previous,1)===key?run+7:7;best=Math.max(best,run-(key===current?7-elapsed:0));previous=key;}
+  let streak=0,cursor=shiftWeek(current,-1);while(complete.has(cursor)){streak+=7;cursor=shiftWeek(cursor,-1);}if(streak||buckets.has(current))streak+=elapsed;
+  return {current,target:weeklyTargetAt(current,goals),count:buckets.get(current)?.size||0,streak,best,complete,buckets,goals};
+}
+
+function renderWeeklyStreak() {
+  const result=getWeeklyStreak(),{current,target,count,streak,best,complete,buckets,goals}=result,remaining=Math.max(0,target-count),wrap=document.getElementById('weekly-streak');
+  const status=!target?'Add a training day to your plan.':!remaining?'Weekly goal met.':`${remaining} more training day${remaining===1?'':'s'} this week.`;
+  wrap.innerHTML=`<div class="weekly-heading"><div><div class="stat-label">Consistency streak</div><h2>🔥 ${streak}-day streak</h2></div><div class="weekly-best">Best secured: ${best} day${best===1?'':'s'}</div></div><div class="weekly-count">${count} / ${target} training days <span>this week · Mon–Sun</span></div><progress aria-label="Training days this week" max="${target||1}" value="${Math.min(count,target)}"></progress><p class="weekly-status" role="status">${h(status)}</p><details class="weekly-results"><summary>How it works</summary><p class="weekly-note">This week stays active through Sunday for make-ups; it resets next Monday only if the goal is missed. Future dates aren’t counted. The first active week starts on Monday once a workout is logged. Each saved training date counts once toward your goal. Your target follows required plan days (up to 7), excluding rest, optional and empty days. Use Save Workout to log a day. Plan changes affect this week onward. Best secured counts only weeks whose goals were met.</p></details><details class="weekly-results"><summary>${calendarViewMode==='year'?'Year':'Month'} · weekly results</summary><div id="weekly-results-list" class="weekly-results-list"></div></details>`;
+  const year=calendarViewMode==='year'?calendarYearView:calendarDate.getFullYear(),month=calendarDate.getMonth(),first=new Date(year,calendarViewMode==='year'?0:month,1),last=new Date(year,calendarViewMode==='year'?12:month+1,0),rows=[];
+  const firstLogged=[...buckets.keys()].sort()[0];
+  for(let key=weekKey(first);key<=weekKey(last);key=shiftWeek(key,1)){
+    const goal=weeklyTargetAt(key,goals),done=buckets.get(key)?.size||0,met=complete.has(key),label=key>current?'Upcoming':!goal?'No goal':met?'Goal met':key===current?'In progress':!firstLogged||key<firstLogged?'Not started':'Missed goal',date=new Date(key+'T12:00:00');
+    rows.push(`<div class="weekly-result ${met?'met':''}"><span>Week of ${date.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</span><strong>${done} / ${goal}</strong><span>${label}</span></div>`);
+  }
+  document.getElementById('weekly-results-list').innerHTML=rows.join('');
+  document.querySelectorAll('#page-calendar [data-date]').forEach(cell=>{const met=complete.has(weekKey(cell.dataset.date));cell.classList.toggle('week-met',met);if(met)cell.title+=(cell.title?' · ':'')+'Weekly goal met';});
+}
+
+function refreshStreakDate() {
+  const today=localDateKey(new Date());if(today===streakDate)return;streakDate=today;syncWeeklyGoal();
+  if(document.getElementById('page-calendar').classList.contains('active'))renderCalendar();if(document.getElementById('page-stats').classList.contains('active'))renderStats();
 }
 
 function getWeightEntries() {
@@ -1343,6 +1406,7 @@ function changeBodyweightUnit(unit) {
 function initializeApp() {
   save('customPlan',getActivePlan());currentDay=Math.min(currentDay,getActivePlan().length-1);save('currentDay',currentDay);
   setupPresets();recomputePRs();renderToday();renderPlan();
+  refreshStreakDate();window.addEventListener('focus',refreshStreakDate);window.addEventListener('pageshow',refreshStreakDate);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshStreakDate();});setInterval(refreshStreakDate,60000);
   let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(document.getElementById('page-progress').classList.contains('active'))renderProgress();if(document.getElementById('page-bodyweight').classList.contains('active'))renderBodyweightChart();},150);});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));editingExIndex=null;editingDayIndex=null;dayEditing=null;}});
 }

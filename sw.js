@@ -1,4 +1,4 @@
-const CACHE = 'megachad-v5-pr-spacing';
+const CACHE = 'megachad-v6-weekly-streak';
 const ASSETS = ['./','./index.html','./app.js','./custom.css','./manifest.json','./icon-180.png','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{const cache=await caches.open(CACHE);await cache.addAll(ASSETS);await self.skipWaiting();})()));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{
