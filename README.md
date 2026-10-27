@@ -9,6 +9,14 @@ Open `index.html` to use the app. No build step or package installation is requi
 - Use the up/down buttons to reorder exercises or days. Add, duplicate and remove workout days; cycles can have 1–31 days. Draft sets follow exercise IDs, so reordering does not move your entered weights onto a different exercise.
 - **Quick select** includes full body, upper/lower, push/pull/legs, 5 × 5 basics, home bodyweight, gentle home basics, and home dumbbell templates. Templates replace the current plan only after confirmation; workout history remains. All template content is editable.
 
+## Exercise quick select
+
+In Plan, **Add Exercise** and **Edit Exercise** suggest names as you type. Exercises already in your plan appear first, followed by past workout names and 110 common gym/home exercise names. Partial words and aliases such as `RDL`, `lat pull down`, and `machine preach` work. Existing exercises in the target day are excluded to avoid duplicate entries, and duplicate catalogue names are merged.
+
+Select with a tap or Arrow keys + Enter. Escape closes suggestions, and Tab moves to the next field. You can always type a custom name. Selecting an exercise from your plan fills empty set/rep fields for a new exercise; values you already entered and existing edit values are preserved. Suggestions work offline and are built from current plan/history data, so exercises added to Pull are immediately reusable on Upper. No additional account, online search or external exercise API is required.
+
+The built-in names are a common starter list, not a statistical popularity ranking. General exercise-name references: [ACE exercise library](https://www.acefitness.org/resources/everyone/exercise-library/) and [NHS strength exercises](https://www.nhs.uk/live-well/exercise/strength-exercises/). The picker supplies names, not individualized training advice.
+
 ## Log and review
 
 Enter weight and reps; valid sets tick automatically. Click ✓ to untick or re-tick a set. Each input and tick change saves immediately on this device, and reopening the app restores the unfinished session. Use Save Workout to finish and add it to History. For unweighted exercises use **0** for the weight. Home bodyweight templates prefill zero. Only completed, valid sets are recorded; unfinished inputs remain drafts until the workout is saved. Drafts survive day changes and reloads.
@@ -53,6 +61,6 @@ HTML references versioned JavaScript and CSS so a newer page cannot reuse old un
 
 Fixed set-button targeting, bodyweight zero-set logging, stale personal records, missing custom exercises in PRs, draft loss/mismatches during reordering, inconsistent unit displays, implicit global-event navigation, unsafe user-text interpolation, incomplete backup restoration/validation, timer completion controls, offline chart dependencies, overly broad service-worker cache cleanup, and oversized calendar empty cells on mobile.
 
-Validated with 42 automated browser workflows in isolated Edge sessions, including mobile layout, offline reload, direct-file use, weekend make-ups, partial-week grace, missed-week resets, backups, year boundaries, daylight saving, catch-up preview/apply/restore, draft recovery and automatic expiry. A Pixel 5 touch emulation also reproduces cached old CSS/JavaScript alongside new HTML and verifies the upgrade without losing drafts. Physical iOS/Android devices were not tested. Browser notifications can be delayed while a phone suspends the app; the timer catches up on resume.
+Validated with 51 automated browser workflows in isolated Edge sessions, including mobile layout, offline reload, direct-file use, weekend make-ups, partial-week grace, missed-week resets, backups, year boundaries, daylight saving, catch-up preview/apply/restore, draft recovery and automatic expiry. A Pixel 5 touch emulation also reproduces cached old CSS/JavaScript alongside new HTML and verifies the upgrade without losing drafts. Physical iOS/Android devices were not tested. Browser notifications can be delayed while a phone suspends the app; the timer catches up on resume.
 
 Training templates are editable starting points, not a popularity ranking or a personalized prescription. References: [ACSM](https://acsm.org/resistance-training-guidelines-update-2026/) and [NHS home strength exercises](https://www.nhs.uk/live-well/exercise/strength-exercises/).

@@ -1097,7 +1097,7 @@
     .stats-grid { grid-template-columns: 1fr 1fr; }
   }
 </style>
-<link rel="stylesheet" href="custom.css?v=c83d25683c8c">
+<link rel="stylesheet" href="custom.css?v=aa77153c818c">
 </head>
 <body>
 
@@ -1308,7 +1308,7 @@
   <div class="modal" style="max-width:400px;" onclick="event.stopPropagation()">
     <div class="modal-title" id="add-ex-modal-title">Add Exercise</div>
     <div class="modal-sub" id="add-ex-day-name"></div>
-    <input class="modal-input" id="add-ex-name" aria-label="Exercise name" maxlength="120" type="text" placeholder="Exercise name (e.g. Pull Ups)">
+    <div class="exercise-autocomplete" id="exercise-autocomplete"><label class="exercise-name-label" for="add-ex-name">Exercise name</label><div class="exercise-name-input-wrap"><input class="modal-input" id="add-ex-name" aria-label="Exercise name" maxlength="120" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="exercise-name-suggestions" aria-describedby="exercise-name-help" autocomplete="off" spellcheck="false" placeholder="Search or type an exercise" oninput="renderExerciseSuggestions()" onfocus="renderExerciseSuggestions()" onclick="if(document.getElementById('exercise-name-suggestions').hidden)renderExerciseSuggestions()" onkeydown="exerciseSuggestionKey(event)"><div class="exercise-name-suggestions" id="exercise-name-suggestions" role="listbox" aria-label="Exercise suggestions" hidden></div></div><p class="exercise-name-help" id="exercise-name-help">Your exercises first, then common gym and home options. Custom names work too.</p><div id="exercise-name-status" class="exercise-suggestion-status" role="status" aria-live="polite"></div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <input class="modal-input" id="add-ex-sets" type="number" aria-label="Number of sets" placeholder="Sets (e.g. 3)" min="1" max="100" step="1" style="margin-bottom:0;">
       <input class="modal-input" id="add-ex-reps" aria-label="Rep target" maxlength="80" type="text" placeholder="Reps (e.g. 8–12)" style="margin-bottom:0;">
@@ -1368,6 +1368,6 @@
   <button class="rest-timer-fab" onclick="toggleRestTimerPanel()">⏱ <span id="rest-timer-fab-time"></span></button>
 </div>
 
-<script src="app.js?v=9d5bd3b43d12"></script>
+<script src="app.js?v=725148ee35da"></script>
 </body>
 </html>
