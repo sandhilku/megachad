@@ -769,10 +769,12 @@ function saveCustomPlan(plan) {
 }
 
 function renderPlan() {
-  updatePlanTitle();syncWeeklyGoal();const plan=getActivePlan();
-  document.getElementById('plan-grid').innerHTML=plan.map((d,di)=>`<article class="plan-card"><div class="plan-header"><div style="flex:1;min-width:0"><div class="plan-day-name">${h(d.name)}</div><div class="plan-focus">${h(d.focus)}</div><span class="day-tag ${TYPE_TAGS[d.type].cls}">${TYPE_TAGS[d.type].label}</span></div><button class="plan-edit-btn" onclick="openDayEditor(${di})" aria-label="Edit day ${di+1}">✎</button></div>
+  if(planRenderedMobile)document.querySelectorAll('#plan-grid details[data-plan-day]').forEach(details=>expandedPlanDays.set(details.dataset.planDay,details.open));
+  updatePlanTitle();syncWeeklyGoal();const plan=getActivePlan(),mobile=matchMedia('(max-width:600px)').matches;planRenderedMobile=mobile;
+  const ids=new Set(plan.map(day=>day.id));for(const id of expandedPlanDays.keys())if(!ids.has(id))expandedPlanDays.delete(id);
+  document.getElementById('plan-grid').innerHTML=plan.map((d,di)=>`<details class="plan-card plan-day" data-plan-day="${h(d.id)}" ${!mobile||expandedPlanDays.get(d.id)?'open':''} ontoggle="rememberPlanDay(this)"><summary class="plan-header plan-day-summary"><div style="flex:1;min-width:0"><div class="plan-day-name">${h(d.name)}</div><div class="plan-focus">${h(d.focus)}</div><span class="day-tag ${TYPE_TAGS[d.type].cls}">${TYPE_TAGS[d.type].label}</span><div class="plan-day-count">${d.exercises.length?d.exercises.length+' exercise'+(d.exercises.length===1?'':'s'):d.type==='rest'?'Rest day':'No exercises yet'}</div></div><button class="plan-edit-btn" onclick="event.preventDefault();event.stopPropagation();openDayEditor(${di})" aria-label="Edit day ${di+1}">✎</button><span class="plan-day-chevron" aria-hidden="true">⌄</span></summary>
     <div class="plan-actions"><button onclick="moveDay(${di},-1)" ${di===0?'disabled':''} aria-label="Move day up">↑ Day</button><button onclick="moveDay(${di},1)" ${di===plan.length-1?'disabled':''} aria-label="Move day down">↓ Day</button><button onclick="duplicateDay(${di})">Duplicate</button><button onclick="removeDay(${di})" ${plan.length===1?'disabled':''}>Remove day</button><button onclick="openAddExercise(${di})">＋ Exercise</button></div>
-    <div class="plan-exercises">${d.exercises.map((e,ei)=>`<div class="plan-ex customizable"><div class="plan-ex-name">${h(e.name)}<small>${h(e.reps)} reps${e.bodyweight?' · bodyweight':''}</small></div><label class="inline-set-label"><input type="number" class="inline-sets" min="1" max="100" step="1" aria-label="Sets for ${h(e.name)}" value="${e.sets}" onchange="setExerciseCount(${di},${ei},this.value)"> sets</label><div class="reorder-buttons"><button onclick="moveExercise(${di},${ei},-1)" ${ei===0?'disabled':''} aria-label="Move ${h(e.name)} up">↑</button><button onclick="moveExercise(${di},${ei},1)" ${ei===d.exercises.length-1?'disabled':''} aria-label="Move ${h(e.name)} down">↓</button><button onclick="openEditExercise(${di},${ei})" aria-label="Edit ${h(e.name)}">✎</button><button onclick="removeExercise(${di},${ei})" aria-label="Remove ${h(e.name)}">×</button></div></div>`).join('')||'<p class="empty-day">Recovery day, or add your first exercise.</p>'}</div></article>`).join('');
+    <div class="plan-exercises">${d.exercises.map((e,ei)=>`<div class="plan-ex customizable"><div class="plan-ex-name">${h(e.name)}<small>${h(e.reps)} reps${e.bodyweight?' · bodyweight':''}</small></div><label class="inline-set-label"><input type="number" class="inline-sets" min="1" max="100" step="1" aria-label="Sets for ${h(e.name)}" value="${e.sets}" onchange="setExerciseCount(${di},${ei},this.value)"> sets</label><div class="reorder-buttons"><button onclick="moveExercise(${di},${ei},-1)" ${ei===0?'disabled':''} aria-label="Move ${h(e.name)} up">↑</button><button onclick="moveExercise(${di},${ei},1)" ${ei===d.exercises.length-1?'disabled':''} aria-label="Move ${h(e.name)} down">↓</button><button onclick="openEditExercise(${di},${ei})" aria-label="Edit ${h(e.name)}">✎</button><button onclick="removeExercise(${di},${ei})" aria-label="Remove ${h(e.name)}">×</button></div></div>`).join('')||'<p class="empty-day">Recovery day, or add your first exercise.</p>'}</div></details>`).join('');
 }
 
 let editingDayIndex = null;
@@ -1033,6 +1035,9 @@ DOT_COLORS.full = '#ffa94d'; DOT_COLORS.home = '#a855f7'; DOT_COLORS.custom = '#
 
 
 
+let planRenderedMobile=false;
+const expandedPlanDays=new Map();
+
 
 
 
@@ -1245,6 +1250,10 @@ function renamePlan() {
 
 function updatePlanTitle() {
   const name=load('planName','Big Boy Plan');document.title=name+' — Workout Tracker';document.getElementById('plan-name-input').value=name;document.getElementById('active-plan-name').textContent=name;
+}
+
+function rememberPlanDay(details) {
+  if(details.isConnected&&planRenderedMobile)expandedPlanDays.set(details.dataset.planDay,details.open);
 }
 
 function openDayEditor(di=null) {

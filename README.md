@@ -4,6 +4,7 @@ Open `index.html` to use the app. No build step or package installation is requi
 
 ## Customize your training
 
+- On phones, each workout day starts collapsed. Tap its header to show or hide its exercises and editing controls. The working day stays expanded through set edits, additions and reordering; desktop starts expanded.
 - **Plan → Plan name** renames the whole plan. The pencil beside a day edits its name, focus and category, including names such as “Day 2 — Push”.
 - Edit an exercise's set count on the **Plan** page. Set counts are read-only on Today. Supported range: 1–100 sets per exercise. Exercise names and rep targets are editable too.
 - Use the up/down buttons to reorder exercises or days. Add, duplicate and remove workout days; cycles can have 1–31 days. Draft sets follow exercise IDs, so reordering does not move your entered weights onto a different exercise.
@@ -61,6 +62,6 @@ HTML references versioned JavaScript and CSS so a newer page cannot reuse old un
 
 Fixed set-button targeting, bodyweight zero-set logging, stale personal records, missing custom exercises in PRs, draft loss/mismatches during reordering, inconsistent unit displays, implicit global-event navigation, unsafe user-text interpolation, incomplete backup restoration/validation, timer completion controls, offline chart dependencies, overly broad service-worker cache cleanup, and oversized calendar empty cells on mobile.
 
-Validated with 51 automated browser workflows in isolated Edge sessions, including mobile layout, offline reload, direct-file use, weekend make-ups, partial-week grace, missed-week resets, backups, year boundaries, daylight saving, catch-up preview/apply/restore, draft recovery and automatic expiry. A Pixel 5 touch emulation also reproduces cached old CSS/JavaScript alongside new HTML and verifies the upgrade without losing drafts. Physical iOS/Android devices were not tested. Browser notifications can be delayed while a phone suspends the app; the timer catches up on resume.
+Validated with 57 automated browser workflows in isolated Edge sessions, including mobile layout, offline reload, direct-file use, weekend make-ups, partial-week grace, missed-week resets, backups, year boundaries, daylight saving, catch-up preview/apply/restore, draft recovery and automatic expiry. A Pixel 5 touch emulation also reproduces cached old CSS/JavaScript alongside new HTML and verifies the upgrade without losing drafts. Physical iOS/Android devices were not tested. Browser notifications can be delayed while a phone suspends the app; the timer catches up on resume.
 
 Training templates are editable starting points, not a popularity ranking or a personalized prescription. References: [ACSM](https://acsm.org/resistance-training-guidelines-update-2026/) and [NHS home strength exercises](https://www.nhs.uk/live-well/exercise/strength-exercises/).
