@@ -45,10 +45,14 @@ Examples: Monday Pull + unavailable Tuesday Push becomes an optional **Upper Bod
 
 Scheduled mixes are listed on Today and Calendar and included in backups. They activate on their training date, keep unfinished drafts through that week, and expire the following Monday. Cancel a plan to restore the original workout and its draft. Replacing a mix requires confirmation. Already logged workouts, invalid pairs, past dates and cross-week dates are rejected.
 
+## App updates and caching
+
+HTML references versioned JavaScript and CSS so a newer page cannot reuse old unversioned files from the browser cache. The service worker preloads the exact versioned URLs using fresh requests and revalidates runtime responses. Worker updates bypass the browser HTTP cache. Updates preserve local workout data; clearing site storage is not required.
+
 ## Fixes and validation
 
 Fixed set-button targeting, bodyweight zero-set logging, stale personal records, missing custom exercises in PRs, draft loss/mismatches during reordering, inconsistent unit displays, implicit global-event navigation, unsafe user-text interpolation, incomplete backup restoration/validation, timer completion controls, offline chart dependencies, overly broad service-worker cache cleanup, and oversized calendar empty cells on mobile.
 
-Validated with 41 automated browser workflows in isolated Edge sessions, including mobile layout, offline reload, direct-file use, weekend make-ups, partial-week grace, missed-week resets, backups, year boundaries, daylight saving, catch-up preview/apply/restore, draft recovery and automatic expiry. Physical iOS/Android devices were not tested. Browser notifications can be delayed while a phone suspends the app; the timer catches up on resume.
+Validated with 42 automated browser workflows in isolated Edge sessions, including mobile layout, offline reload, direct-file use, weekend make-ups, partial-week grace, missed-week resets, backups, year boundaries, daylight saving, catch-up preview/apply/restore, draft recovery and automatic expiry. A Pixel 5 touch emulation also reproduces cached old CSS/JavaScript alongside new HTML and verifies the upgrade without losing drafts. Physical iOS/Android devices were not tested. Browser notifications can be delayed while a phone suspends the app; the timer catches up on resume.
 
 Training templates are editable starting points, not a popularity ranking or a personalized prescription. References: [ACSM](https://acsm.org/resistance-training-guidelines-update-2026/) and [NHS home strength exercises](https://www.nhs.uk/live-well/exercise/strength-exercises/).

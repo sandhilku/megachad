@@ -993,7 +993,7 @@ updateRestTimerDisplay();
 // ===================== PWA SETUP =====================
 if ('serviceWorker' in navigator && ['http:','https:'].includes(location.protocol)) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {
+    navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(() => {
       // Fails silently if sw.js isn't hosted alongside index.html yet
     });
   });
