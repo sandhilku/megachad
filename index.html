@@ -1129,6 +1129,8 @@
     <div class="day-tag tag-pull" id="today-day-tag">PULL</div>
   </div>
 
+  <div class="absence-toolbar"><button onclick="openAbsencePlanner()">Plan an absence</button></div><div id="planned-today"></div>
+  <div id="catchup-suggestion" aria-live="polite"></div>
   <div class="exercise-list" id="exercise-list"></div>
 
   <p class="logging-hint">Valid weight (0 for bodyweight) and reps automatically tick each set. Entries and tick changes save immediately on this device — reopen to continue. You can untick a set any time. Use Save Workout to finish and add it to History.</p><button class="save-btn" onclick="saveWorkout()">💾 SAVE WORKOUT</button>
@@ -1164,6 +1166,7 @@
     <button class="filter-chip" id="calendar-view-toggle" onclick="toggleCalendarView()">View Full Year</button>
   </div>
 
+  <div class="absence-toolbar"><button onclick="openAbsencePlanner()">Plan an absence</button></div><div id="planned-calendar"></div>
   <section id="weekly-streak" class="weekly-streak" aria-label="Weekly training streak"></section>
   <div id="calendar-month-view">
     <div class="calendar-header">
@@ -1297,6 +1300,8 @@
 
 </main>
 
+<div class="modal-overlay" id="absence-modal" onclick="if(event.target===this)closeAbsencePlanner()"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="absence-title"><h2 class="modal-title" id="absence-title">Plan an absence</h2><p class="catchup-note">Choose the date you cannot train and the workout you can do instead. Plan within one Monday–Sunday week. Workout defaults follow plan order from Monday; you can choose different workouts.</p><label>I cannot train on<input class="modal-input" id="absence-missed-date" type="date" onchange="syncAbsenceDay('missed')"></label><label>Workout I will miss<select class="modal-input" id="absence-missed-day"></select></label><label>I can train on<input class="modal-input" id="absence-train-date" type="date" onchange="syncAbsenceDay('train')"></label><label>Workout on that day<select class="modal-input" id="absence-train-day"></select></label><p class="absence-error" id="absence-error" role="alert"></p><div class="modal-btns"><button class="modal-btn" onclick="closeAbsencePlanner()">Cancel</button><button class="modal-btn primary" onclick="previewPlannedAbsence()">Preview workout</button></div></div></div>
+<div class="modal-overlay" id="catchup-modal" onclick="if(event.target===this)closeCatchupPreview()"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="catchup-title"><h2 class="modal-title" id="catchup-title">Adjust this workout</h2><div id="catchup-options"></div><div class="modal-btns"><button class="modal-btn" onclick="closeCatchupPreview()">Keep original</button><button class="modal-btn primary" id="catchup-apply" onclick="applyCatchupSession()">Apply for this workout</button></div></div></div>
 <div class="modal-overlay" id="day-editor-modal" onclick="if(event.target===this)closeDayEditor()"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="day-editor-title"><h2 class="modal-title" id="day-editor-title">Edit workout day</h2><label>Day name<input class="modal-input" id="day-edit-name" maxlength="120" placeholder="e.g. Day 2 — Push"></label><label>Focus / notes<input class="modal-input" id="day-edit-focus" maxlength="240"></label><label>Category<select class="modal-input" id="day-edit-type"></select></label><div class="modal-btns"><button class="modal-btn" onclick="closeDayEditor()">Cancel</button><button class="modal-btn primary" onclick="saveDayEditor()">Save day</button></div></div></div>
 <!-- ADD EXERCISE MODAL -->
 <div class="modal-overlay" id="add-ex-modal" onclick="closeAddExercise()">

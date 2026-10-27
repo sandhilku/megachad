@@ -23,16 +23,32 @@ Use the **Body Weight** tab to add today's weight or a backdated measurement, ed
 
 ## Day streak with rest-day protection
 
-The Calendar and Stats show a **calendar-day streak including rest days**. Meet a five-workout goal for two complete Monday–Sunday weeks and the streak is 14 days, not 10. Future dates do not count; a current week only contributes the days that have elapsed. The first active week starts on Monday once a workout is logged. Before any workout is logged the streak is zero. No rest-day entries are needed.
+The Calendar and Stats show a **calendar-day streak including rest days**. Meet a five-workout goal for two complete Monday–Sunday weeks and the streak is 14 days, not 10. Future dates do not count; a current week only contributes the days that have elapsed. Before any workout is logged the streak is zero. No rest-day entries are needed.
 
-Keep the streak by reaching your plan's required training-day count in each **Monday–Sunday** week. A missed Friday can be completed on Saturday or Sunday. Multiple saved workouts on the same date count as one training day. An unfinished current week preserves and provisionally extends the streak; it resets at the next Monday only if the previous week's goal was missed. A new active week then starts its own streak. Best secured streak counts only weeks whose goals were met, capped at elapsed days for the current week. Goal-met weeks are highlighted in month/year calendars, with weekly results and current progress above the calendar.
+**First partial week gets grace.** Starting on Tuesday protects Tuesday–Sunday even if the full weekly target is not reached. A Saturday start protects Saturday–Sunday. The counter begins from the recorded tracking start, and the normal target starts the following Monday. Monday starts use the normal full-week goal. The recorded start is included in backups and does not move forward just because an old workout is deleted.
+
+Keep the streak by reaching your plan's required training-day count in each **Monday–Sunday** week after the first partial week. A missed Friday can be completed on Saturday or Sunday. Multiple saved workouts on the same date count as one training day. An unfinished current week preserves and provisionally extends the streak; it resets at the next Monday only if the previous week's goal was missed. A new active week then starts its own streak. Best secured includes goal-met weeks and the protected first partial week, capped at elapsed days for the current week. Goal-met weeks are highlighted in month/year calendars, with weekly results and current progress above the calendar.
 
 Targets follow required plan days with exercises, excluding rest/optional/empty days and capped at seven distinct dates per week. Plan changes affect the current week onward; recorded targets for earlier weeks are retained and exported in backups. On first upgrade, older logs use the current plan's goal because earlier versions did not record goals. Streaks use this device's local dates. Saving an unfinished draft alone does not log a training day; use Save Workout.
+
+## Optional missed-day adjustments
+
+On Today, select your next planned workout. If an earlier workout is unlogged, the app can offer an **Upper Body** session to combine missed Pull with Push (or vice versa), or a **Full Body** session to include a missed Legs day with an upper-body workout. Suggestions follow plan order starting Monday, for cycles of up to seven days. Days before tracking began, future workouts, logged days and rest/optional days do not trigger suggestions.
+
+**Preview** shows exercises from both original workouts. Select the ones you want, then **Apply for this workout**. Set counts and rep targets come from your plan. The permanent plan stays unchanged; **Restore original** brings back its draft. Adjusted drafts persist on reload, are included in backups and expire at the end of the week. Plan edits invalidate an outdated adjustment. A combined session counts as one training date toward the weekly target. A missed source day is marked covered only if at least one exercise from it is actually logged. Keeping the original dismisses that suggestion for the week.
+
+## Plan a known absence
+
+Use **Plan an absence** on Today or Calendar. Choose the unavailable date/workout and the date/workout you can attend, within the same Monday–Sunday week. Dates can be today or in a future week. Defaults follow plan order from Monday; choose different workouts if needed.
+
+Examples: Monday Pull + unavailable Tuesday Push becomes an optional **Upper Body** session on Monday. Thursday Upper + unavailable Friday Legs becomes an optional **Full Body** session on Thursday. Preview the exercises, then schedule the mix. The permanent plan and weekly training-day target stay unchanged; the combined session counts as one actual training date.
+
+Scheduled mixes are listed on Today and Calendar and included in backups. They activate on their training date, keep unfinished drafts through that week, and expire the following Monday. Cancel a plan to restore the original workout and its draft. Replacing a mix requires confirmation. Already logged workouts, invalid pairs, past dates and cross-week dates are rejected.
 
 ## Fixes and validation
 
 Fixed set-button targeting, bodyweight zero-set logging, stale personal records, missing custom exercises in PRs, draft loss/mismatches during reordering, inconsistent unit displays, implicit global-event navigation, unsafe user-text interpolation, incomplete backup restoration/validation, timer completion controls, offline chart dependencies, overly broad service-worker cache cleanup, and oversized calendar empty cells on mobile.
 
-Validated with 28 automated browser workflows in an isolated Edge session, including a 390px mobile viewport, offline reload, direct-file use, weekend make-ups, missed-week resets, day counting, goal changes, backups, year boundaries and daylight saving. Physical iOS/Android devices were not tested. Browser notifications can be delayed while a phone suspends the app; the timer catches up on resume.
+Validated with 41 automated browser workflows in isolated Edge sessions, including mobile layout, offline reload, direct-file use, weekend make-ups, partial-week grace, missed-week resets, backups, year boundaries, daylight saving, catch-up preview/apply/restore, draft recovery and automatic expiry. Physical iOS/Android devices were not tested. Browser notifications can be delayed while a phone suspends the app; the timer catches up on resume.
 
 Training templates are editable starting points, not a popularity ranking or a personalized prescription. References: [ACSM](https://acsm.org/resistance-training-guidelines-update-2026/) and [NHS home strength exercises](https://www.nhs.uk/live-well/exercise/strength-exercises/).

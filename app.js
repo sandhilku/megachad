@@ -208,8 +208,8 @@ function saveBodyweight() {
 }
 
 function exportData() {
-  const drafts=getDrafts(),day=getActivePlan()[currentDay];drafts[day.id]=Object.fromEntries(day.exercises.map((e,i)=>[e.id,copy(setData[i]||[])]));
-  const data={version:3,exportedAt:new Date().toISOString(),weeklyGoals:readWeeklyGoals(),history:load('history',[]),prs:load('prs',{}),customPlan:getActivePlan(),planName:load('planName','Big Boy Plan'),bodyweight:load('bodyweight',null),bodyweightLog:load('bodyweightLog',[]),weightUnit,currentDay,workoutDrafts:drafts};
+  const drafts=getDrafts(),day=getSessionDay();drafts[day.id]=Object.fromEntries(day.exercises.map((e,i)=>[e.id,copy(setData[i]||[])]));
+  const data={version:5,exportedAt:new Date().toISOString(),trackingStartedOn:load('trackingStartedOn',null),sessionOverrides:readSessionOverrides(),weeklyGoals:readWeeklyGoals(),history:load('history',[]),prs:load('prs',{}),customPlan:getActivePlan(),planName:load('planName','Big Boy Plan'),bodyweight:load('bodyweight',null),bodyweightLog:load('bodyweightLog',[]),weightUnit,currentDay,workoutDrafts:drafts};
   const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=`workout-backup-${localDateKey(new Date())}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Backup exported');
 }
 
@@ -276,7 +276,8 @@ function selectDay(i) {
 function renderToday() {
   const openCards=[...document.querySelectorAll('.exercise-card.open')].map(c=>Number(c.id.replace('ex-card-','')));
   restoreDraft();
-  const day = getActivePlan()[currentDay];
+  const day = getSessionDay();
+  renderCatchupSuggestion();
   document.querySelector('.save-btn').disabled=day.exercises.length===0;
   document.getElementById('today-day-name').textContent = day.name;
   document.getElementById('today-day-focus').textContent = day.focus;
@@ -390,12 +391,13 @@ function markDone(ei) {
 }
 
 function saveWorkout() {
-  const day=getActivePlan()[currentDay];
+  const base=getActivePlan()[currentDay],day=getSessionDay();
   const exercises=day.exercises.map((e,i)=>({name:e.name,sets:(setData[i]||[]).filter(s=>s.done&&validSet(s)).map(s=>({weight:Number(s.weight),reps:Number(s.reps),done:true}))})).filter(e=>e.sets.length);
   if(!exercises.length){toast('Complete at least one valid set, then save');return;}
   const history=load('history',[]),id=Math.max(Date.now(),...history.map(w=>w.id+1));
-  syncWeeklyGoal();history.unshift({id,date:new Date().toISOString(),planName:load('planName','Big Boy Plan'),weeklyTarget:getWeeklyTarget(),dayIndex:currentDay,dayName:day.name,type:day.type,exercises});
-  save('history',history);recomputePRs();const drafts=getDrafts();delete drafts[day.id];save('workoutDrafts',drafts);setData={};renderToday();toast('Workout saved — completed sets logged');
+  const covered=day.coverage?day.coverage.filter(source=>exercises.some(e=>source.names.includes(e.name.toLocaleLowerCase()))).map(source=>source.id):[base.id];
+  syncWeeklyGoal();history.unshift({id,date:new Date().toISOString(),planName:load('planName','Big Boy Plan'),weeklyTarget:getWeeklyTarget(),dayId:base.id,coveredDayIds:covered,dayIndex:currentDay,dayName:day.name,type:day.type,exercises});
+  save('history',history);recomputePRs();const drafts=getDrafts();delete drafts[day.id];if(day.id!==base.id)delete drafts[base.id];save('workoutDrafts',drafts);if(day.id!==base.id){const overrides=readSessionOverrides();delete overrides[sessionOverrideKey(base.id)];save('sessionOverrides',overrides);}setData={};renderToday();toast('Workout saved — completed sets logged');
 }
 
 // ===================== PRs =====================
@@ -1102,6 +1104,35 @@ const PRESETS=[
 
 
 
+
+
+
+
+let catchupPreview=null;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 let streakDate=null;
 
 let editingWeightId=null;
@@ -1161,7 +1192,7 @@ function getDrafts() {
 }
 
 function persistDraft() {
-  const day=getActivePlan()[currentDay]; if(!day)return;
+  const day=getSessionDay(); if(!day)return;
   const drafts=getDrafts(), rows=Object.create(null);
   day.exercises.forEach((e,i)=>{if(setData[i])rows[e.id]=copy(setData[i]);});
   drafts[day.id]=rows; save('workoutDrafts',drafts);
@@ -1169,7 +1200,7 @@ function persistDraft() {
 
 function restoreDraft() {
   const plan=getActivePlan();currentDay=Math.min(Math.max(0,currentDay),plan.length-1);
-  const day=plan[currentDay],draft=getDrafts()[day.id]||{};setData={};
+  const day=getSessionDay(),draft=getDrafts()[day.id]||{};setData={};
   day.exercises.forEach((e,i)=>{
     const old=Array.isArray(draft[e.id])?draft[e.id]:[];
     setData[i]=Array.from({length:e.sets},(_,j)=>{
@@ -1275,9 +1306,10 @@ function validateBackup(data) {
   const history=validateHistory(data.history),customPlan=data.customPlan==null?validatePlan(copy(PLAN)):validatePlan(data.customPlan);
   const log=data.bodyweightLog??[];if(!Array.isArray(log)||log.some(p=>!p||!Number.isFinite(Date.parse(p.date))||!Number.isFinite(Number(p.weight))||Number(p.weight)<=0))throw Error('Invalid body weight log');
   if(data.bodyweight!=null && (!Number.isFinite(Number(data.bodyweight))||Number(data.bodyweight)<=0))throw Error('Invalid body weight');
+  const sessionOverrides=validateSessionOverrides(data.sessionOverrides??{},customPlan);if(data.trackingStartedOn!=null&&!validLocalDate(data.trackingStartedOn))throw Error('Invalid tracking start');
   const drafts=Object.create(null),raw=data.workoutDrafts??{};
   if(typeof raw!=='object'||raw===null||Array.isArray(raw))throw Error('Invalid workout drafts');
-  for(const day of customPlan){
+  for(const day of [...customPlan,...Object.values(sessionOverrides).map(item=>item.day)]){
     const source=Object.hasOwn(raw,day.id)?raw[day.id]:null;if(!source)continue;
     if(typeof source!=='object'||Array.isArray(source))throw Error('Invalid workout draft');
     const rows=Object.create(null);
@@ -1288,7 +1320,163 @@ function validateBackup(data) {
     }
     drafts[day.id]=rows;
   }
-  return {history,customPlan,weeklyGoals:validateWeeklyGoals(data.weeklyGoals??[]),planName:typeof data.planName==='string'&&data.planName.trim()?data.planName.trim().slice(0,120):'My Workout Plan',bodyweight:data.bodyweight==null?null:Number(data.bodyweight),bodyweightLog:log,weightUnit:['kg','lbs'].includes(data.weightUnit)?data.weightUnit:'kg',currentDay:Number.isInteger(data.currentDay)?Math.min(Math.max(data.currentDay,0),customPlan.length-1):0,workoutDrafts:drafts};
+  return {history,customPlan,trackingStartedOn:data.trackingStartedOn??null,sessionOverrides,weeklyGoals:validateWeeklyGoals(data.weeklyGoals??[]),planName:typeof data.planName==='string'&&data.planName.trim()?data.planName.trim().slice(0,120):'My Workout Plan',bodyweight:data.bodyweight==null?null:Number(data.bodyweight),bodyweightLog:log,weightUnit:['kg','lbs'].includes(data.weightUnit)?data.weightUnit:'kg',currentDay:Number.isInteger(data.currentDay)?Math.min(Math.max(data.currentDay,0),customPlan.length-1):0,workoutDrafts:drafts};
+}
+
+function validLocalDate(value) {
+  return typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(value+'T12:00:00'))&&localDateKey(new Date(value+'T12:00:00'))===value;
+}
+
+function ensureTrackingStart() {
+  const stored=load('trackingStartedOn',null),today=localDateKey(new Date()),first=load('history',[]).filter(w=>w.type!=='rest'&&w.exercises.some(e=>e.sets.some(validSet))).map(w=>localDateKey(w.date)).filter(d=>d<=today).sort()[0],start=[validLocalDate(stored)?stored:null,first,today].filter(Boolean).sort()[0];
+  if(stored!==start)save('trackingStartedOn',start);return start;
+}
+
+function sessionOverrideKey(id,date=new Date()) { return weekKey(date)+':'+id; }
+
+function sessionSignature(base,missed) { return JSON.stringify([base,missed]); }
+
+function validateSessionOverrides(raw,plan) {
+  if(!raw||typeof raw!=='object'||Array.isArray(raw)||Object.keys(raw).length>500)throw Error('Invalid session adjustments');const result=Object.create(null),ids=new Set(plan.map(day=>day.id));
+  for(const [key,item] of Object.entries(raw)){
+    if(!item||!validLocalDate(item.week)||weekKey(item.week)!==item.week||key!==item.week+':'+item.baseDayId||!plan.some(d=>d.id===item.baseDayId)||!plan.some(d=>d.id===item.missedDayId)||item.baseDayId===item.missedDayId||typeof item.signature!=='string')throw Error('Invalid session adjustment');
+    if(item.date!=null&&(!validLocalDate(item.date)||weekKey(item.date)!==item.week||!validLocalDate(item.missedDate)||weekKey(item.missedDate)!==item.week||item.date===item.missedDate))throw Error('Invalid adjustment dates');
+    const day=validatePlan([item.day])[0];if(!['upper','full'].includes(day.type)||ids.has(day.id)||!day.exercises.length)throw Error('Invalid adjusted workout');ids.add(day.id);result[key]={week:item.week,baseDayId:item.baseDayId,missedDayId:item.missedDayId,signature:item.signature,day,...(item.date?{date:item.date,missedDate:item.missedDate}:{})};
+  }
+  return result;
+}
+
+function readSessionOverrides() {
+  try{return validateSessionOverrides(load('sessionOverrides',{}),getActivePlan());}catch{return Object.create(null);}
+}
+
+function getSessionDay(index=currentDay) {
+  const plan=getActivePlan(),base=plan[index];if(!base)return null;
+  const entry=readSessionOverrides()[sessionOverrideKey(base.id)],missed=entry&&plan.find(d=>d.id===entry.missedDayId);
+  return entry&&missed&&(!entry.date||entry.date<=localDateKey(new Date()))&&entry.signature===sessionSignature(base,missed)?{...entry.day,plannedDate:entry.date||null,coverage:[base,missed].map(day=>({id:day.id,names:day.exercises.map(e=>e.name.toLocaleLowerCase())})),baseDayId:base.id}:base;
+}
+
+function isPlanDayLogged(day,history=load('history',[]),date=new Date()) {
+  const current=weekKey(date),today=localDateKey(new Date());return history.some(w=>weekKey(w.date)===current&&localDateKey(w.date)<=today&&w.exercises.some(e=>e.sets.some(validSet))&&(w.dayId===day.id||Array.isArray(w.coveredDayIds)&&w.coveredDayIds.includes(day.id)||w.dayName===day.name));
+}
+
+function combinedSessionType(base,missed) {
+  if(base.type==='legs'&&['push','pull','upper','full'].includes(missed.type)||missed.type==='legs'&&['push','pull','upper','full'].includes(base.type))return 'full';
+  return ['push','pull','upper'].includes(base.type)&&['push','pull','upper'].includes(missed.type)&&base.type!==missed.type?'upper':null;
+}
+
+function getCatchupSuggestion(index=currentDay) {
+  const plan=getActivePlan(),base=plan[index],now=new Date(),weekday=(now.getDay()+6)%7,today=localDateKey(now),start=load('trackingStartedOn',today),history=load('history',[]);
+  if(!base||plan.length>7||!base.exercises.length||base.type==='rest'||index>weekday||getSessionDay(index).id!==base.id||isPlanDayLogged(base,history))return null;
+  for(let i=0;i<index;i++){
+    const missed=plan[i],date=new Date(weekKey(now)+'T12:00:00');date.setDate(date.getDate()+i);
+    if(localDateKey(date)>=today||localDateKey(date)<start||!missed.exercises.length||missed.type==='rest'||missed.type==='optional'||isPlanDayLogged(missed,history))continue;
+    const type=combinedSessionType(base,missed);if(!type||type==='upper'&&base.type==='upper')continue;
+    const key=weekKey(now)+':'+base.id+':'+missed.id;if(load('dismissedCatchups',[]).includes(key))continue;
+    return {key,index,missedIndex:i,base,missed,type,name:type==='full'?'Full Body':'Upper Body'};
+  }
+  return null;
+}
+
+function renderCatchupSuggestion() {
+  renderPlannedSessions();
+  const wrap=document.getElementById('catchup-suggestion');if(!wrap)return;const base=getActivePlan()[currentDay],session=getSessionDay();wrap.innerHTML='';
+  if(session.id!==base.id){if(session.plannedDate)return;wrap.innerHTML=`<div class="catchup-card"><strong>${h(session.name)} · this workout only</strong><p>Your original ${h(base.name)} plan is kept. This session counts as one training day.</p><button onclick="restoreOriginalSession()">Restore ${h(base.name)}</button></div>`;return;}
+  const suggestion=getCatchupSuggestion();if(!suggestion)return;
+  wrap.innerHTML=`<div class="catchup-card"><strong>Adjust this workout?</strong><p>No ${h(suggestion.missed.name)} workout is saved this week. Make ${h(base.name)} an ${suggestion.type==='full'?'adjustable Full Body':'Upper Body'} session with exercises from both days?</p><div class="catchup-actions"><button onclick="openCatchupPreview()">Preview ${h(suggestion.name)}</button><button onclick="dismissCatchup()">Keep ${h(base.name)}</button></div></div>`;
+}
+
+function dismissCatchup() {
+  const suggestion=getCatchupSuggestion();if(!suggestion)return;const dismissed=load('dismissedCatchups',[]);save('dismissedCatchups',[...dismissed,suggestion.key].slice(-500));renderCatchupSuggestion();
+}
+
+function defaultCatchupSelection(suggestion) {
+  const pool=[...suggestion.base.exercises.map(e=>({...e,source:'base'})),...suggestion.missed.exercises.map(e=>({...e,source:'missed'}))],chosen=new Set(),names=new Set();
+  const pick=(source,pattern)=>{const index=pool.findIndex((e,i)=>e.source===source&&!chosen.has(i)&&!names.has(e.name.toLocaleLowerCase())&&pattern.test(e.name));if(index>=0){chosen.add(index);names.add(pool[index].name.toLocaleLowerCase());}};
+  if(suggestion.type==='full'){
+    const legs=suggestion.base.type==='legs'?'base':'missed',upper=legs==='base'?'missed':'base';
+    pick(legs,/squat|leg press|lunge|step.?up/i);pick(legs,/rdl|romanian|deadlift|leg curl|hip thrust|bridge/i);
+    pick(upper,/bench|push.?up|chest|press/i);pick(upper,/row|pulldown|pull.?up/i);
+  }else{
+    const push=['push','upper'].includes(suggestion.base.type)?'base':'missed',pull=push==='base'?'missed':'base';pick(push,/bench|push.?up|chest/i);pick(push,/shoulder|overhead press/i);pick(push,/tricep/i);pick(pull,/row/i);pick(pull,/pulldown|pull.?up/i);pick(pull,/bicep|preacher|dumbbell curl/i);
+  }
+  for(const source of ['missed','base'])while([...chosen].filter(i=>pool[i].source===source).length<Math.min(3,pool.filter(e=>e.source===source).length)&&chosen.size<6){const before=chosen.size;pick(source,/.*/);if(before===chosen.size)break;}
+  return {pool,chosen};
+}
+
+function openCatchupPreview() {
+  const suggestion=getCatchupSuggestion();if(suggestion)showCatchupPreview(suggestion);
+}
+
+function showCatchupPreview(suggestion) {
+  const {pool,chosen}=defaultCatchupSelection(suggestion);catchupPreview={...suggestion,pool,signature:sessionSignature(suggestion.base,suggestion.missed)};
+  document.getElementById('catchup-title').textContent='Make this '+suggestion.name+'?';
+  document.getElementById('catchup-apply').textContent=suggestion.planned?'Schedule this workout':'Apply for this workout';
+  document.getElementById('catchup-options').innerHTML=`${suggestion.planned?`<p class="planned-preview-date">Train ${h(formatPlanDate(suggestion.trainDate))} · Covers ${h(suggestion.missed.name)} on ${h(formatPlanDate(suggestion.missedDate))}</p>`:''}<p class="catchup-note">Choose the exercises for this session. Sets and rep targets come from your plan. Only this session changes; your saved plan stays unchanged. This counts as one training day, not two. Your weekly target is unchanged.</p>${pool.map((e,i)=>`<label class="catchup-option"><input type="checkbox" value="${i}" ${chosen.has(i)?'checked':''}><span>${h(e.name)}<small>${e.sets} sets × ${h(e.reps)} · ${h(e.source==='base'?suggestion.base.name:suggestion.missed.name)}</small></span></label>`).join('')}`;
+  document.getElementById('catchup-modal').classList.add('open');document.querySelector('#catchup-modal .modal').scrollTop=0;const title=document.getElementById('catchup-title');title.tabIndex=-1;title.focus({preventScroll:true});
+}
+
+function closeCatchupPreview() { document.getElementById('catchup-modal').classList.remove('open');catchupPreview=null; }
+
+function applyCatchupSession() {
+  const preview=catchupPreview;let suggestion;try{suggestion=preview?.planned?buildPlannedSuggestion(preview):getCatchupSuggestion();}catch(error){toast(error.message);return;}if(!preview||!suggestion||preview.key!==suggestion.key||preview.signature!==sessionSignature(suggestion.base,suggestion.missed)){closeCatchupPreview();toast('The plan changed. Preview the adjustment again.');return;}
+  const selected=[...document.querySelectorAll('#catchup-options input:checked')].map(input=>preview.pool[Number(input.value)]),names=new Set(),ids=new Set();
+  const exercises=selected.filter(e=>{if(!e)return false;const name=e.name.toLocaleLowerCase();if(names.has(name))return false;names.add(name);return true;}).map(e=>{let id=e.id;while(ids.has(id))id=uid();ids.add(id);return {id,name:e.name,sets:e.sets,reps:e.reps,bodyweight:e.bodyweight};});
+  if(!exercises.length||!selected.some(e=>e?.source==='base')||!selected.some(e=>e?.source==='missed')){toast('Choose at least one exercise from each workout');return;}
+  const day=validatePlan([{id:'session-'+uid(),name:preview.name+(preview.planned?' — planned':' — make-up'),focus:preview.base.name+' + '+preview.missed.name,type:preview.type,exercises}])[0],date=preview.planned?preview.trainDate:localDateKey(new Date()),key=sessionOverrideKey(preview.base.id,date),overrides=readSessionOverrides();
+  if(overrides[key]&&!confirm('Replace the adjustment already planned for this workout? Its draft is kept.'))return;
+  persistDraft();overrides[key]={week:weekKey(date),baseDayId:preview.base.id,missedDayId:preview.missed.id,signature:preview.signature,day,...(preview.planned?{date,missedDate:preview.missedDate}:{})};save('sessionOverrides',overrides);if(preview.planned&&date<=localDateKey(new Date())&&weekKey(date)===weekKey(new Date())){currentDay=preview.index;save('currentDay',currentDay);}closeCatchupPreview();setData={};renderToday();if(document.getElementById('page-calendar').classList.contains('active'))renderCalendar();toast(preview.planned?'Workout scheduled. Your original plan is kept.':'Adjusted for this workout. Your original plan is kept.');
+}
+
+function restoreOriginalSession() {
+  const base=getActivePlan()[currentDay];persistDraft();const overrides=readSessionOverrides();delete overrides[sessionOverrideKey(base.id)];save('sessionOverrides',overrides);setData={};renderToday();
+}
+
+function formatPlanDate(date) { return new Date(date+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}); }
+
+function syncAbsenceDay(which) {
+  const date=document.getElementById('absence-'+which+'-date').value,select=document.getElementById('absence-'+which+'-day'),plan=getActivePlan();if(!validLocalDate(date)){select.value='';return;}
+  const index=(new Date(date+'T12:00:00').getDay()+6)%7;select.value=plan.length<=7&&plan[index]?.exercises.length&&plan[index].type!=='rest'?String(index):'';
+}
+
+function openAbsencePlanner() {
+  const today=localDateKey(new Date()),next=new Date(today+'T12:00:00');next.setDate(next.getDate()+1);
+  for(const which of ['missed','train']){const input=document.getElementById('absence-'+which+'-date');input.min=today;input.value=which==='train'?today:localDateKey(next);document.getElementById('absence-'+which+'-day').innerHTML='<option value="">Choose workout</option>'+getActivePlan().map((d,i)=>d.type!=='rest'&&d.exercises.length?`<option value="${i}">${h(d.name)}</option>`:'').join('');syncAbsenceDay(which);}
+  document.getElementById('absence-error').textContent='';document.getElementById('absence-modal').classList.add('open');document.getElementById('absence-missed-date').focus();
+}
+
+function closeAbsencePlanner() { document.getElementById('absence-modal').classList.remove('open'); }
+
+function buildPlannedSuggestion(options) {
+  const {trainDate,missedDate}=options,today=localDateKey(new Date()),plan=getActivePlan(),index=options.index===''?NaN:Number(options.index),missedIndex=options.missedIndex===''?NaN:Number(options.missedIndex),base=plan[index],missed=plan[missedIndex];
+  if(!validLocalDate(trainDate)||!validLocalDate(missedDate)||trainDate<today||missedDate<today)throw Error('Choose today or a future date.');
+  if(trainDate===missedDate)throw Error('Choose different training and unavailable dates.');
+  if(weekKey(trainDate)!==weekKey(missedDate))throw Error('Choose both dates in the same Monday–Sunday week.');
+  if(!Number.isInteger(index)||!Number.isInteger(missedIndex)||!base||!missed||index===missedIndex||!base.exercises.length||!missed.exercises.length||base.type==='rest'||missed.type==='rest')throw Error('Choose two different training workouts.');
+  const type=combinedSessionType(base,missed);if(!type)throw Error('Choose complementary upper-body days, or combine a Legs day with an upper-body day.');
+  if(isPlanDayLogged(base,load('history',[]),trainDate)||isPlanDayLogged(missed,load('history',[]),missedDate))throw Error('One of these workouts is already logged for that week.');
+  return {planned:true,key:weekKey(trainDate)+':'+base.id+':'+missed.id+':'+trainDate+':'+missedDate,index,missedIndex,base,missed,type,name:type==='full'?'Full Body':'Upper Body',trainDate,missedDate};
+}
+
+function previewPlannedAbsence() {
+  try{const suggestion=buildPlannedSuggestion({trainDate:document.getElementById('absence-train-date').value,missedDate:document.getElementById('absence-missed-date').value,index:document.getElementById('absence-train-day').value,missedIndex:document.getElementById('absence-missed-day').value});closeAbsencePlanner();showCatchupPreview(suggestion);}catch(error){document.getElementById('absence-error').textContent=error.message;}
+}
+
+function getPlannedSessions() {
+  const plan=getActivePlan(),current=weekKey(new Date());return Object.entries(readSessionOverrides()).filter(([,entry])=>entry.date&&entry.week>=current&&entry.signature===sessionSignature(plan.find(d=>d.id===entry.baseDayId),plan.find(d=>d.id===entry.missedDayId))).map(([key,entry])=>({key,...entry})).sort((a,b)=>a.date.localeCompare(b.date)||a.day.name.localeCompare(b.day.name));
+}
+
+function renderPlannedSessions() {
+  const entries=getPlannedSessions(),today=localDateKey(new Date()),html=entries.length?`<section class="planned-sessions"><h3>Planned workouts</h3>${entries.map((entry,i)=>`<div class="planned-session"><div><strong>${h(entry.day.name)}</strong><p>${h(formatPlanDate(entry.date))} · ${h(getActivePlan().find(d=>d.id===entry.missedDayId).name)} covered from ${h(formatPlanDate(entry.missedDate))}</p></div><div class="catchup-actions">${entry.date<=today&&entry.week===weekKey(new Date())?`<button onclick="openPlannedSession(${i})">Open workout</button>`:''}<button onclick="cancelPlannedSession(${i})">Cancel plan</button></div></div>`).join('')}</section>`:'';
+  for(const id of ['planned-today','planned-calendar']){const element=document.getElementById(id);if(element)element.innerHTML=html;}
+}
+
+function openPlannedSession(index) {
+  const entry=getPlannedSessions()[index];if(!entry||entry.date>localDateKey(new Date())||entry.week!==weekKey(new Date()))return;const day=getActivePlan().findIndex(d=>d.id===entry.baseDayId);showPage('today');selectDay(day);
+}
+
+function cancelPlannedSession(index) {
+  const entry=getPlannedSessions()[index];if(!entry)return;persistDraft();const overrides=readSessionOverrides();delete overrides[entry.key];save('sessionOverrides',overrides);setData={};renderToday();if(document.getElementById('page-calendar').classList.contains('active'))renderCalendar();toast('Planned adjustment cancelled. Original workout kept.');
 }
 
 function weekKey(value) {
@@ -1317,30 +1505,34 @@ function weeklyTargetAt(key,goals,fallback=getWeeklyTarget()) {
 }
 
 function syncWeeklyGoal() {
+  ensureTrackingStart();
   const current=weekKey(new Date()),target=getWeeklyTarget(),goals=readWeeklyGoals();
   if(!goals.length){const weeks=load('history',[]).filter(w=>localDateKey(w.date)<=localDateKey(new Date())).map(w=>weekKey(w.date)).sort();goals.push({week:weeks[0]||current,target});}
   const existing=goals.find(g=>g.week===current);if(existing&&existing.target===target&&localStorage.getItem('weeklyGoals')!==null)return;
   if(existing)existing.target=target;else goals.push({week:current,target});save('weeklyGoals',goals.sort((a,b)=>a.week.localeCompare(b.week)));
 }
 
-function getWeeklyStreak(history=load('history',[]),goals=readWeeklyGoals(),now=new Date()) {
+function getWeeklyStreak(history=load('history',[]),goals=readWeeklyGoals(),now=new Date(),startedOn=null) {
   const current=weekKey(now),today=localDateKey(now),buckets=new Map();
   for(const w of history){const day=localDateKey(w.date);if(day>today||w.type==='rest'||!w.exercises.some(e=>e.sets.some(validSet)))continue;const key=weekKey(day);if(!buckets.has(key))buckets.set(key,new Set());buckets.get(key).add(day);}
   const complete=new Set([...buckets].filter(([key,days])=>{const target=weeklyTargetAt(key,goals);return target>0&&days.size>=target;}).map(([key])=>key));
+  const firstLogged=[...buckets.values()].flatMap(days=>[...days]).sort()[0],stored=arguments.length===0?load('trackingStartedOn',null):startedOn,start=[firstLogged,validLocalDate(stored)?stored:null].filter(Boolean).sort()[0],firstWeek=start?weekKey(start):null,graceWeek=start&&start!==firstWeek&&buckets.has(firstWeek)?firstWeek:null,graceOffset=graceWeek?(new Date(start+'T12:00:00').getDay()+6)%7:0,protectedWeeks=new Set(complete);
+  if(graceWeek)protectedWeeks.add(graceWeek);
   const elapsed=(now.getDay()+6)%7+1;
-  let best=0,run=0,previous=null;for(const key of [...complete].sort()){run=previous&&shiftWeek(previous,1)===key?run+7:7;best=Math.max(best,run-(key===current?7-elapsed:0));previous=key;}
-  let streak=0,cursor=shiftWeek(current,-1);while(complete.has(cursor)){streak+=7;cursor=shiftWeek(cursor,-1);}if(streak||buckets.has(current))streak+=elapsed;
-  return {current,target:weeklyTargetAt(current,goals),count:buckets.get(current)?.size||0,streak,best,complete,buckets,goals};
+  let best=0,run=0,previous=null;for(const key of [...protectedWeeks].sort()){const credit=key===graceWeek?7-graceOffset:7;run=previous&&shiftWeek(previous,1)===key?run+credit:credit;best=Math.max(best,run-(key===current?7-elapsed:0));previous=key;}
+  let streak=0,cursor=shiftWeek(current,-1);while(protectedWeeks.has(cursor)){streak+=cursor===graceWeek?7-graceOffset:7;cursor=shiftWeek(cursor,-1);}if(streak||buckets.has(current))streak+=elapsed-(current===graceWeek?graceOffset:0);
+  return {current,target:weeklyTargetAt(current,goals),count:buckets.get(current)?.size||0,streak,best,complete,protectedWeeks,graceWeek,start,buckets,goals};
 }
 
 function renderWeeklyStreak() {
+  renderPlannedSessions();
   const result=getWeeklyStreak(),{current,target,count,streak,best,complete,buckets,goals}=result,remaining=Math.max(0,target-count),wrap=document.getElementById('weekly-streak');
-  const status=!target?'Add a training day to your plan.':!remaining?'Weekly goal met.':`${remaining} more training day${remaining===1?'':'s'} this week.`;
-  wrap.innerHTML=`<div class="weekly-heading"><div><div class="stat-label">Consistency streak</div><h2>🔥 ${streak}-day streak</h2></div><div class="weekly-best">Best secured: ${best} day${best===1?'':'s'}</div></div><div class="weekly-count">${count} / ${target} training days <span>this week · Mon–Sun</span></div><progress aria-label="Training days this week" max="${target||1}" value="${Math.min(count,target)}"></progress><p class="weekly-status" role="status">${h(status)}</p><details class="weekly-results"><summary>How it works</summary><p class="weekly-note">This week stays active through Sunday for make-ups; it resets next Monday only if the goal is missed. Future dates aren’t counted. The first active week starts on Monday once a workout is logged. Each saved training date counts once toward your goal. Your target follows required plan days (up to 7), excluding rest, optional and empty days. Use Save Workout to log a day. Plan changes affect this week onward. Best secured counts only weeks whose goals were met.</p></details><details class="weekly-results"><summary>${calendarViewMode==='year'?'Year':'Month'} · weekly results</summary><div id="weekly-results-list" class="weekly-results-list"></div></details>`;
+  const status=!target?'Add a training day to your plan.':current===result.graceWeek?'First-week grace active.':!remaining?'Weekly goal met.':`${remaining} more training day${remaining===1?'':'s'} this week.`;
+  wrap.innerHTML=`<div class="weekly-heading"><div><div class="stat-label">Consistency streak</div><h2>🔥 ${streak}-day streak</h2></div><div class="weekly-best">Best secured: ${best} day${best===1?'':'s'}</div></div><div class="weekly-count">${count} / ${target} training days <span>this week · Mon–Sun</span></div><progress aria-label="Training days this week" max="${target||1}" value="${Math.min(count,target)}"></progress><p class="weekly-status" role="status">${h(status)}</p><details class="weekly-results"><summary>How it works</summary><p class="weekly-note">This week stays active through Sunday for make-ups; it resets next Monday only if the goal is missed. Future dates aren’t counted. Your first partial week has grace: the full target starts next Monday. Grace counts from the day tracking began, including rest days. Each saved training date counts once toward your goal. Your target follows required plan days (up to 7), excluding rest, optional and empty days. Use Save Workout to log a day. Plan changes affect this week onward. Best secured includes goal-met weeks and the protected first partial week. Suggestions follow plan order from Monday and never change a workout without your choice.</p></details><details class="weekly-results"><summary>${calendarViewMode==='year'?'Year':'Month'} · weekly results</summary><div id="weekly-results-list" class="weekly-results-list"></div></details>`;
   const year=calendarViewMode==='year'?calendarYearView:calendarDate.getFullYear(),month=calendarDate.getMonth(),first=new Date(year,calendarViewMode==='year'?0:month,1),last=new Date(year,calendarViewMode==='year'?12:month+1,0),rows=[];
   const firstLogged=[...buckets.keys()].sort()[0];
   for(let key=weekKey(first);key<=weekKey(last);key=shiftWeek(key,1)){
-    const goal=weeklyTargetAt(key,goals),done=buckets.get(key)?.size||0,met=complete.has(key),label=key>current?'Upcoming':!goal?'No goal':met?'Goal met':key===current?'In progress':!firstLogged||key<firstLogged?'Not started':'Missed goal',date=new Date(key+'T12:00:00');
+    const goal=weeklyTargetAt(key,goals),done=buckets.get(key)?.size||0,met=complete.has(key),label=key>current?'Upcoming':!goal?'No goal':key===result.graceWeek?'First-week grace':met?'Goal met':key===current?'In progress':!firstLogged||key<firstLogged?'Not started':'Missed goal',date=new Date(key+'T12:00:00');
     rows.push(`<div class="weekly-result ${met?'met':''}"><span>Week of ${date.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</span><strong>${done} / ${goal}</strong><span>${label}</span></div>`);
   }
   document.getElementById('weekly-results-list').innerHTML=rows.join('');
@@ -1349,7 +1541,7 @@ function renderWeeklyStreak() {
 
 function refreshStreakDate() {
   const today=localDateKey(new Date());if(today===streakDate)return;streakDate=today;syncWeeklyGoal();
-  if(document.getElementById('page-calendar').classList.contains('active'))renderCalendar();if(document.getElementById('page-stats').classList.contains('active'))renderStats();
+  if(document.getElementById('page-calendar').classList.contains('active'))renderCalendar();if(document.getElementById('page-stats').classList.contains('active'))renderStats();if(document.getElementById('page-today').classList.contains('active'))renderToday();
 }
 
 function getWeightEntries() {
@@ -1405,9 +1597,9 @@ function changeBodyweightUnit(unit) {
 
 function initializeApp() {
   save('customPlan',getActivePlan());currentDay=Math.min(currentDay,getActivePlan().length-1);save('currentDay',currentDay);
-  setupPresets();recomputePRs();renderToday();renderPlan();
+  setupPresets();recomputePRs();syncWeeklyGoal();renderToday();renderPlan();
   refreshStreakDate();window.addEventListener('focus',refreshStreakDate);window.addEventListener('pageshow',refreshStreakDate);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshStreakDate();});setInterval(refreshStreakDate,60000);
   let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(document.getElementById('page-progress').classList.contains('active'))renderProgress();if(document.getElementById('page-bodyweight').classList.contains('active'))renderBodyweightChart();},150);});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));editingExIndex=null;editingDayIndex=null;dayEditing=null;}});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));editingExIndex=null;editingDayIndex=null;dayEditing=null;catchupPreview=null;}});
 }
 try{initializeApp();}catch(error){console.error(error);setupPresets();renderToday();renderPlan();}
