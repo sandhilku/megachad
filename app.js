@@ -159,6 +159,7 @@ function getLastSession(name) {
 
 // ===================== SETTINGS =====================
 function renderSettings() {
+  renderUsagePreference();
   const bw = getCurrentBodyweight();
   document.getElementById('settings-bw-input').placeholder=`Weight (${weightUnit})`;
   document.getElementById('settings-bw-current').textContent =
@@ -238,9 +239,11 @@ let modalCb = null;
 // ===================== NAV =====================
 function showPage(id) {
   const page=document.getElementById('page-'+id);if(!page)return;
+  const changed=!page.classList.contains('active');
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p===page));
   document.querySelectorAll('.nav-tab').forEach(b=>b.classList.toggle('active',b.dataset.page===id));
   ({today:renderToday,history:renderHistory,calendar:renderCalendar,prs:renderPRs,stats:renderStats,progress:renderProgress,bodyweight:renderBodyweight,plan:renderPlan,settings:renderSettings})[id]?.();
+  if(changed)trackUsage(USAGE_PAGE_EVENTS[id]);
 }
 
 // ===================== TODAY =====================
@@ -396,6 +399,8 @@ function saveWorkout() {
   const covered=day.coverage?day.coverage.filter(source=>exercises.some(e=>source.names.includes(e.name.toLocaleLowerCase()))).map(source=>source.id):[base.id];
   syncWeeklyGoal();history.unshift({id,date:new Date().toISOString(),planName:load('planName','Big Boy Plan'),weeklyTarget:getWeeklyTarget(),dayId:base.id,coveredDayIds:covered,dayIndex:currentDay,dayName:day.name,type:day.type,exercises});
   save('history',history);recomputePRs();const drafts=getDrafts();delete drafts[day.id];if(day.id!==base.id)delete drafts[base.id];save('workoutDrafts',drafts);if(day.id!==base.id){const overrides=readSessionOverrides();delete overrides[sessionOverrideKey(base.id)];save('sessionOverrides',overrides);}setData={};renderToday();toast('Workout saved — completed sets logged');
+  trackUsage('Workout Saved');
+  if(history.length===1&&!load('analyticsFirstWorkoutSaved',false)){try{save('analyticsFirstWorkoutSaved',true);trackUsage('First Workout Saved');}catch{}}
 }
 
 // ===================== PRs =====================
@@ -1158,6 +1163,18 @@ let editingWeightId=null;
 
 
 
+// Owner setup: copy the public website ID from Umami's Tracking code.
+// Leave websiteId empty until provided. No API keys belong here.
+const USAGE_CONFIG=Object.freeze({websiteId:'13928003-0448-4537-979d-b70a50422747',scriptUrl:'https://cloud.umami.is/script.js',hostname:'sandhilku.github.io',path:'/megachad/'});
+const USAGE_PAGE_EVENTS=Object.freeze({today:'View Today',history:'View History',calendar:'View Calendar',prs:'View PRs',stats:'View Stats',progress:'View Progress',bodyweight:'View Body Weight',plan:'View Plan',settings:'View Settings'});
+const USAGE_EVENTS=new Set(['pageview','Workout Saved','First Workout Saved','Plan Saved','Plan Imported','Plan Applied',...Object.values(USAGE_PAGE_EVENTS)]);
+let usageLoading=false,usageReady=false,usageFailed=false,usageVisitSent=false,usageQueue=[];
+
+
+
+
+
+
 
 
 function validSet(s) {
@@ -1256,7 +1273,7 @@ function moveDay(di,delta) {
 function renamePlan() {
   const value=document.getElementById('plan-name-input').value.trim();if(!value){toast('Enter a plan name');return;}
   try{const entry=makeSavedPlan(getSavedPlans(),value.slice(0,120),getActivePlan(),load('activeSavedPlanId',null));replaceStoredData({planName:entry.name,savedPlans:entry.library,activeSavedPlanId:entry.id});}catch{toast('Plan could not be saved');return;}
-  setupPresets();updatePlanTitle();toast('Plan saved to Quick select');
+  setupPresets();updatePlanTitle();toast('Plan saved to Quick select');trackUsage('Plan Saved');
 }
 
 function validateSavedPlans(value) {
@@ -1326,7 +1343,7 @@ function applyPreset(id) {
   const saved=id.startsWith('saved:')?getSavedPlans().find(p=>p.id===id.slice(6)):null,p=saved||PRESETS.find(p=>p.id===id);if(!p)return;
   if(!confirm(`Use ${p.name}? Your current plan stays in Quick select. Unfinished sets and scheduled adjustments are cleared; saved history is kept.`))return;
   try{rememberCurrentPlan();const plan=validatePlan(saved?copy(saved.plan):p.build()),entry=makeSavedPlan(getSavedPlans(),p.name,plan,saved?.id);replaceStoredData({customPlan:plan,planName:entry.name,savedPlans:entry.library,activeSavedPlanId:entry.id,workoutDrafts:{},sessionOverrides:{},dismissedCatchups:[],currentDay:0});}catch{toast('Plan could not be applied; your current plan is kept');return;}
-  setData={};currentDay=0;expandedPlanDays.clear();setupPresets();renderPlan();renderToday();toast('Plan applied — every day and exercise is editable');
+  setData={};currentDay=0;expandedPlanDays.clear();setupPresets();renderPlan();renderToday();toast('Plan applied — every day and exercise is editable');trackUsage('Plan Applied');
 }
 
 function setupPresets() {
@@ -1376,7 +1393,7 @@ function importWorkoutPlan(event) {
     if(!confirm(`Import "${checked.planName}" (${checked.customPlan.length} days)? Your current plan stays in Quick select. This activates the imported plan and clears unfinished sets and scheduled adjustments. Your history, stats and body weight stay saved.`))return;
     try{const previous=makeSavedPlan(getSavedPlans(),load('planName','Big Boy Plan'),getActivePlan(),load('activeSavedPlanId',null)),entry=makeSavedPlan(previous.library,checked.planName,checked.customPlan);replaceStoredData({...checked,planName:entry.name,savedPlans:entry.library,activeSavedPlanId:entry.id,currentDay:0,workoutDrafts:{},sessionOverrides:{},dismissedCatchups:[]});}
     catch{toast('Plan could not be saved; previous data was restored');return;}
-    currentDay=0;setData={};expandedPlanDays.clear();setupPresets();renderPlan();renderToday();toast('Workout plan imported and added to Quick select');
+    currentDay=0;setData={};expandedPlanDays.clear();setupPresets();renderPlan();renderToday();toast('Workout plan imported and added to Quick select');trackUsage('Plan Imported');
   }).catch(()=>toast('Could not read workout plan file'));
 }
 
@@ -1742,10 +1759,55 @@ function changeBodyweightUnit(unit) {
   setWeightUnit(unit);if(id)editWeightEntry(id);document.getElementById('bw-date').value=date;if(kg!==null)input.value=toDisplayWeight(kg);
 }
 
+function usageAllowed() {
+  try{return /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(USAGE_CONFIG.websiteId)&&USAGE_CONFIG.scriptUrl==='https://cloud.umami.is/script.js'&&location.protocol==='https:'&&location.hostname===USAGE_CONFIG.hostname&&[USAGE_CONFIG.path,USAGE_CONFIG.path+'index.html'].includes(location.pathname)&&navigator.onLine!==false&&!['1','yes'].includes(navigator.doNotTrack||window.doNotTrack)&&navigator.globalPrivacyControl!==true&&localStorage.getItem('analyticsOptOut')!=='true';}catch{return false;}
+}
+
+function cleanUsagePayload(type,payload) {
+  const name=payload?.name||'pageview';if(type!=='event'||!usageAllowed()||!USAGE_EVENTS.has(name))return false;
+  let referrer='';try{const url=new URL(document.referrer);if(['https:','http:'].includes(url.protocol))referrer=url.origin;}catch{}
+  return {website:USAGE_CONFIG.websiteId,hostname:USAGE_CONFIG.hostname,url:USAGE_CONFIG.path,title:'Workout Tracker',referrer,language:navigator.language,screen:`${screen.width}x${screen.height}`,...(name==='pageview'?{}:{name})};
+}
+
+function initializeUsageAnalytics() {
+  if(!usageAllowed()||usageLoading||usageReady||usageFailed)return;
+  usageLoading=true;
+  const script=document.createElement('script');script.src=USAGE_CONFIG.scriptUrl;script.async=true;script.referrerPolicy='no-referrer';script.id='usage-analytics-script';
+  script.dataset.websiteId=USAGE_CONFIG.websiteId;script.dataset.autoTrack='false';script.dataset.domains=USAGE_CONFIG.hostname;script.dataset.excludeSearch='true';script.dataset.excludeHash='true';script.dataset.doNotTrack='true';script.dataset.beforeSend='cleanUsagePayload';
+  script.onload=()=>{usageLoading=false;usageReady=typeof window.umami?.track==='function';usageFailed=!usageReady;const queued=usageQueue;usageQueue=[];if(usageAllowed()&&usageReady)queued.forEach(trackUsage);};
+  script.onerror=()=>{usageLoading=false;usageFailed=true;usageQueue=[];};
+  document.head.append(script);
+}
+
+function trackUsage(name) {
+  try{
+    if(!USAGE_EVENTS.has(name)||!usageAllowed()||usageFailed)return;
+    if(!usageReady){if(usageQueue.length<30)usageQueue.push(name);initializeUsageAnalytics();return;}
+    if(name==='pageview'&&usageVisitSent)return;
+    const payload=cleanUsagePayload('event',name==='pageview'?{}:{name});if(!payload)return;
+    const pending=window.umami.track(payload);if(pending?.catch)pending.catch(()=>{});if(name==='pageview')usageVisitSent=true;
+  }catch{} // Analytics never interrupts saving or editing a workout.
+}
+
+function renderUsagePreference() {
+  const input=document.getElementById('usage-analytics-toggle');if(!input)return;
+  try{input.checked=localStorage.getItem('analyticsOptOut')!=='true';}catch{input.checked=false;}
+  const status=document.getElementById('usage-analytics-status');
+  status.textContent=!USAGE_CONFIG.websiteId?'Usage collection is not active yet.':usageAllowed()?'Basic usage sharing is enabled on this device.':'Usage collection is inactive on this device or preview.';
+}
+
+function setUsagePreference(enabled) {
+  try{localStorage.setItem('analyticsOptOut',enabled?'false':'true');}catch{toast('Could not save this preference');renderUsagePreference();return;}
+  if(!enabled)usageQueue=[];
+  else trackUsage('pageview');
+  renderUsagePreference();toast(enabled?'Usage sharing enabled':'Usage sharing disabled');
+}
+
 function initializeApp() {
   save('customPlan',getActivePlan());currentDay=Math.min(currentDay,getActivePlan().length-1);save('currentDay',currentDay);
   rememberCurrentPlan();
   setupPresets();recomputePRs();syncWeeklyGoal();renderToday();renderPlan();
+  trackUsage('pageview');trackUsage('View Today');
   document.addEventListener('click',event=>{const wrapper=document.getElementById('exercise-autocomplete');if(wrapper&&!wrapper.contains(event.target))hideExerciseSuggestions();});
   refreshStreakDate();window.addEventListener('focus',refreshStreakDate);window.addEventListener('pageshow',refreshStreakDate);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshStreakDate();});setInterval(refreshStreakDate,60000);
   let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(document.getElementById('page-progress').classList.contains('active'))renderProgress();if(document.getElementById('page-bodyweight').classList.contains('active'))renderBodyweightChart();},150);});

@@ -75,3 +75,26 @@ Plan has compact Export Plan / Import Plan buttons. A plan-only JSON contains it
 ## Saved plans in Quick select
 
 Save Plan adds the named active plan to Your saved plans. Exercise and day edits update its saved entry. Imports also join the list automatically; importing or selecting another plan retains the previous plan in Quick select, while clearing unfinished sets and scheduled adjustments after confirmation. Saved history and measurements stay unchanged. Same-name different plans receive a numbered suffix; identical imports are reused. Existing installations automatically retain their active plan when upgrading. Full backups (version 7) include all saved plans and the active selection; older backups restore their active plan into the list.
+
+## Owner analytics (Umami Cloud)
+
+Usage analytics is configured for the owner's Umami website ID `13928003-0448-4537-979d-b70a50422747`. This is a public tracking ID, not a login credential. The private dashboard is available by signing in at https://cloud.umami.is/. Do not enable a public Share URL unless you want to publish analytics.
+
+Collection runs only at `https://sandhilku.github.io/megachad/` and its `index.html` URL. Local files, development servers, other paths, offline actions, browser Do Not Track / Global Privacy Control and the Settings opt-out are excluded. Existing local workout history is never uploaded or replayed. Collection begins after this build is approved and published; browser blockers and offline use can make counts lower than actual usage.
+
+One manual pageview is sent per page load. The following fixed custom events measure usage:
+
+- `Workout Saved`: a successful completed-workout save.
+- `First Workout Saved`: the first save with no previous history, guarded by a browser-local marker. This measures first-use activation, not registered-user signups or reliable cross-device identity.
+- `Plan Saved`, `Plan Imported`, `Plan Applied`: successful explicit actions, not routine plan autosaves or cancelled imports.
+- `View Today`, `View History`, `View Calendar`, `View PRs`, `View Stats`, `View Progress`, `View Body Weight`, `View Plan`, `View Settings`: actual tab changes; rerendering the same tab does not count again.
+
+Use the Umami website Overview for daily/weekly visitors, visits, pageviews and event totals. Use Events or Goals for Workout Saved / First Workout Saved conversions, and compare date ranges to follow growth. No dashboard credentials or private analytics API key are included in the static app.
+
+Tracker auto-collection is disabled. A before-send allowlist limits outgoing events to the public website ID, fixed host/path/title, referrer origin (without its path/query), browser language, screen dimensions and the fixed event name. No plan names, exercise names, body weights, workout sets/reps, file contents, query parameters, URL fragments, user IDs, session replays or error traces are sent. Umami receives normal network/browser metadata when requests reach its service; this is usage analytics, not a fitness-data upload. The tracker is loaded without a referrer header.
+
+Settings → Usage Analytics lets each browser disable sharing. This preference and the first-workout marker are intentionally device-local and excluded from workout backups so a restore cannot turn sharing back on. The app does not queue offline events. A blocked or failed tracker never blocks logging, editing, import/export or offline app installation. The worker does not cache or prefetch Umami's remote tracker.
+
+References: [Umami tracker configuration](https://docs.umami.is/docs/tracker-configuration), [manual tracker functions](https://docs.umami.is/docs/tracker-functions), [Umami Cloud free Hobby plan](https://docs.umami.is/docs/cloud/faq).
+
+Verified with the real public Umami tracker in isolated Edge/Pixel browser tests; all analytics requests were intercepted locally and no test traffic was sent to the owner's dashboard.

@@ -17,3 +17,4 @@
 
 .plan-day-summary:focus-visible{outline-offset:-3px}
 .plan-transfer{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 18px}.plan-transfer button{font-size:12px;padding:8px 12px;border:1px solid var(--border);border-radius:7px;background:var(--card);color:var(--text);min-height:40px}.plan-transfer span{font-size:11px;color:var(--muted)}
+.usage-toggle{display:flex;flex-direction:row;align-items:center;gap:10px;margin:16px 0;color:var(--text);font-size:13px}.usage-toggle input{width:20px;height:20px;accent-color:var(--accent)}

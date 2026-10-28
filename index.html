@@ -1097,7 +1097,7 @@
     .stats-grid { grid-template-columns: 1fr 1fr; }
   }
 </style>
-<link rel="stylesheet" href="custom.css?v=d694c13d9e75">
+<link rel="stylesheet" href="custom.css?v=f6a574ae33cf">
 </head>
 <body>
 
@@ -1283,6 +1283,10 @@
   </div>
 
   <div class="plan-card" style="padding:20px;margin-bottom:16px;">
+    <div class="plan-day-name" style="margin-bottom:10px;">Usage Analytics</div>
+    <p class="plan-focus">Basic visit and feature-use events help improve the app. Exercise names, workout records, body weights and plan names are not included. Umami processes basic browser and usage information. This choice applies to this browser.</p>
+    <label class="usage-toggle"><input id="usage-analytics-toggle" type="checkbox" onchange="setUsagePreference(this.checked)">Share basic usage</label><p id="usage-analytics-status" class="plan-focus" role="status"></p>
+  </div><div class="plan-card" style="padding:20px;margin-bottom:16px;">
     <div class="plan-day-name" style="margin-bottom:10px;">Backup & Restore</div>
     <div class="plan-focus" style="margin-bottom:14px;">Export everything: workout plan, history, personal records, progress, streaks, body weight, unfinished sets, scheduled adjustments, all saved plans and saved preferences. Restore the backup on another device to continue. For plan-only sharing, use the Plan page.</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -1369,6 +1373,6 @@
   <button class="rest-timer-fab" onclick="toggleRestTimerPanel()">⏱ <span id="rest-timer-fab-time"></span></button>
 </div>
 
-<script src="app.js?v=2d8c46b9552a"></script>
+<script src="app.js?v=108fc4ae8389"></script>
 </body>
 </html>
