@@ -554,7 +554,7 @@ function renderStats() {
     <div class="stat-card">
       <div class="stat-label">Day Streak</div>
       <div class="stat-value">${streak}</div>
-      <div class="stat-sub">calendar days · rest included</div>
+      <div class="stat-sub">calendar days · through last finish</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Fav Split</div>
@@ -1169,6 +1169,7 @@ const MUSCLE_SEARCH_ALIASES={'front-delts':'front shoulders anterior deltoids','
 
 
 let catchupPreview=null;
+
 
 
 
@@ -1899,19 +1900,33 @@ function getWeeklyStreak(history=load('history',[]),goals=readWeeklyGoals(),now=
   const current=weekKey(now),today=localDateKey(now),buckets=new Map();
   for(const w of history){const day=localDateKey(w.date);if(day>today||w.type==='rest'||!w.exercises.some(e=>e.sets.some(validSet)))continue;const key=weekKey(day);if(!buckets.has(key))buckets.set(key,new Set());buckets.get(key).add(day);}
   const complete=new Set([...buckets].filter(([key,days])=>{const target=weeklyTargetAt(key,goals);return target>0&&days.size>=target;}).map(([key])=>key));
-  const firstLogged=[...buckets.values()].flatMap(days=>[...days]).sort()[0],stored=arguments.length===0?load('trackingStartedOn',null):startedOn,start=[firstLogged,validLocalDate(stored)?stored:null].filter(Boolean).sort()[0],firstWeek=start?weekKey(start):null,graceWeek=start&&start!==firstWeek&&buckets.has(firstWeek)?firstWeek:null,graceOffset=graceWeek?(new Date(start+'T12:00:00').getDay()+6)%7:0,protectedWeeks=new Set(complete);
+  const dates=[...buckets.values()].flatMap(days=>[...days]).sort(),start=dates[0]||null,lastFinished=dates.at(-1)||null,firstWeek=start?weekKey(start):null,graceWeek=start&&start!==firstWeek?firstWeek:null,protectedWeeks=new Set(complete);
   if(graceWeek)protectedWeeks.add(graceWeek);
-  const elapsed=(now.getDay()+6)%7+1;
-  let best=0,run=0,previous=null;for(const key of [...protectedWeeks].sort()){const credit=key===graceWeek?7-graceOffset:7;run=previous&&shiftWeek(previous,1)===key?run+credit:credit;best=Math.max(best,run-(key===current?7-elapsed:0));previous=key;}
-  let streak=0,cursor=shiftWeek(current,-1);while(protectedWeeks.has(cursor)){streak+=cursor===graceWeek?7-graceOffset:7;cursor=shiftWeek(cursor,-1);}if(streak||buckets.has(current))streak+=elapsed-(current===graceWeek?graceOffset:0);
-  return {current,target:weeklyTargetAt(current,goals),count:buckets.get(current)?.size||0,streak,best,complete,protectedWeeks,graceWeek,start,buckets,goals};
+  const sortedDays=new Map([...buckets].map(([key,days])=>[key,[...days].sort()]));
+  let best=0,runStart=null,previous=null;
+  for(const key of [...protectedWeeks].sort()){
+    const days=sortedDays.get(key);if(!days?.length)continue;
+    if(!previous||shiftWeek(previous,1)!==key)runStart=days[0];
+    best=Math.max(best,finishedCalendarSpan(runStart,days.at(-1)));previous=key;
+  }
+  let streak=0;
+  if(lastFinished){
+    const anchorWeek=weekKey(lastFinished);let active=true;
+    for(let key=anchorWeek;key<current;key=shiftWeek(key,1))if(!protectedWeeks.has(key)){active=false;break;}
+    if(active){let chainWeek=anchorWeek;while(protectedWeeks.has(shiftWeek(chainWeek,-1)))chainWeek=shiftWeek(chainWeek,-1);streak=finishedCalendarSpan(sortedDays.get(chainWeek)[0],lastFinished);}
+  }
+  return {current,target:weeklyTargetAt(current,goals),count:buckets.get(current)?.size||0,streak,best,complete,protectedWeeks,graceWeek,start,lastFinished,buckets,goals};
+}
+
+function finishedCalendarSpan(first,last) {
+  const utc=key=>{const [year,month,day]=key.split('-').map(Number);return Date.UTC(year,month-1,day);};return Math.max(0,Math.round((utc(last)-utc(first))/86400000)+1);
 }
 
 function renderWeeklyStreak() {
   renderPlannedSessions();
   const result=getWeeklyStreak(),{current,target,count,streak,best,complete,buckets,goals}=result,remaining=Math.max(0,target-count),wrap=document.getElementById('weekly-streak');
   const status=!target?'Add a training day to your plan.':current===result.graceWeek?'First-week grace active.':!remaining?'Weekly goal met.':`${remaining} more training day${remaining===1?'':'s'} this week.`;
-  wrap.innerHTML=`<div class="weekly-heading"><div><div class="stat-label">Consistency streak</div><h2>🔥 ${streak}-day streak</h2></div><div class="weekly-best">Best secured: ${best} day${best===1?'':'s'}</div></div><div class="weekly-count">${count} / ${target} training days <span>this week · Mon–Sun</span></div><progress aria-label="Training days this week" max="${target||1}" value="${Math.min(count,target)}"></progress><p class="weekly-status" role="status">${h(status)}</p><details class="weekly-results"><summary>How it works</summary><p class="weekly-note">This week stays active through Sunday for make-ups; it resets next Monday only if the goal is missed. Future dates aren’t counted. Your first partial week has grace: the full target starts next Monday. Grace counts from the day tracking began, including rest days. Each saved training date counts once toward your goal. Your target follows required plan days (up to 7), excluding rest, optional and empty days. Use Save Workout to log a day. Plan changes affect this week onward. Best secured includes goal-met weeks and the protected first partial week. Suggestions follow plan order from Monday and never change a workout without your choice.</p></details><details class="weekly-results"><summary>${calendarViewMode==='year'?'Year':'Month'} · weekly results</summary><div id="weekly-results-list" class="weekly-results-list"></div></details>`;
+  wrap.innerHTML=`<div class="weekly-heading"><div><div class="stat-label">Consistency streak</div><h2>🔥 ${streak}-day streak</h2></div><div class="weekly-best">Best secured: ${best} day${best===1?'':'s'}</div></div><div class="weekly-count">${count} / ${target} training days <span>this week · Mon–Sun</span></div><progress aria-label="Training days this week" max="${target||1}" value="${Math.min(count,target)}"></progress><p class="weekly-status" role="status">${h(status)}</p><details class="weekly-results"><summary>How it works</summary><p class="weekly-note">This week stays active through Sunday for make-ups; it resets next Monday only if the goal is missed. Future dates aren’t counted. Your first partial week has grace: the full target starts next Monday. Your streak starts with your first finished workout and advances only when another workout is finished. Rest days between finished workouts count; opening the app or ticking sets does not add days. Each finished training date counts once toward your goal. Your target follows required plan days (up to 7), excluding rest, optional and empty days. Use Finish Workout to log a day. Plan changes affect this week onward. Best secured includes goal-met weeks and the protected first partial week. Suggestions follow plan order from Monday and never change a workout without your choice.</p></details><details class="weekly-results"><summary>${calendarViewMode==='year'?'Year':'Month'} · weekly results</summary><div id="weekly-results-list" class="weekly-results-list"></div></details>`;
   const year=calendarViewMode==='year'?calendarYearView:calendarDate.getFullYear(),month=calendarDate.getMonth(),first=new Date(year,calendarViewMode==='year'?0:month,1),last=new Date(year,calendarViewMode==='year'?12:month+1,0),rows=[];
   const firstLogged=[...buckets.keys()].sort()[0];
   for(let key=weekKey(first);key<=weekKey(last);key=shiftWeek(key,1)){
