@@ -209,7 +209,7 @@ function saveBodyweight() {
 
 function exportData() {
   const drafts=getDrafts(),day=getSessionDay();drafts[day.id]=Object.fromEntries(day.exercises.map((e,i)=>[e.id,copy(setData[i]||[])]));
-  const data={version:6,kind:'megachad-backup',exportedAt:new Date().toISOString(),trackingStartedOn:load('trackingStartedOn',null),sessionOverrides:readSessionOverrides(),weeklyGoals:readWeeklyGoals(),history:load('history',[]),prs:load('prs',{}),customPlan:getActivePlan(),planName:load('planName','Big Boy Plan'),bodyweight:load('bodyweight',null),bodyweightLog:load('bodyweightLog',[]),weightUnit,currentDay,workoutDrafts:drafts,progressEx:load('progressEx',null),dismissedCatchups:load('dismissedCatchups',[]),notifyPermissionAsked:load('notifyPermissionAsked',false)};
+  const data={version:7,savedPlans:getSavedPlans(),activeSavedPlanId:load('activeSavedPlanId',null),kind:'megachad-backup',exportedAt:new Date().toISOString(),trackingStartedOn:load('trackingStartedOn',null),sessionOverrides:readSessionOverrides(),weeklyGoals:readWeeklyGoals(),history:load('history',[]),prs:load('prs',{}),customPlan:getActivePlan(),planName:load('planName','Big Boy Plan'),bodyweight:load('bodyweight',null),bodyweightLog:load('bodyweightLog',[]),weightUnit,currentDay,workoutDrafts:drafts,progressEx:load('progressEx',null),dismissedCatchups:load('dismissedCatchups',[]),notifyPermissionAsked:load('notifyPermissionAsked',false)};
   downloadWorkoutJSON(data,`workout-backup-${localDateKey(new Date())}.json`);toast('Full backup exported');
 }
 
@@ -218,10 +218,10 @@ function importData(event) {
   if(file.size>10000000){toast('Backup is too large (maximum 10 MB)');return;}
   file.text().then(text=>{
     let checked;try{checked=validateBackup(JSON.parse(text));}catch(error){toast('Import cancelled: '+error.message);return;}
-    if(!confirm('Restore this full backup? It replaces your plan, history, stats, streak data, body weight, unfinished sets and saved preferences. Export your current backup first if needed.'))return;
-    try{replaceStoredData({...checked,prs:calculateBackupPRs(checked.history)});}
+    if(!confirm('Restore this full backup? It replaces all saved plans, history, stats, streak data, body weight, unfinished sets and saved preferences. Export your current backup first if needed.'))return;
+    try{const entry=makeSavedPlan(checked.savedPlans,checked.planName,checked.customPlan,checked.activeSavedPlanId);replaceStoredData({...checked,savedPlans:entry.library,activeSavedPlanId:entry.id,planName:entry.name,prs:calculateBackupPRs(checked.history)});}
     catch{toast('Import could not be saved; previous data was restored');return;}
-    weightUnit=checked.weightUnit;currentDay=checked.currentDay;progressEx=checked.progressEx;notifyPermissionAsked=checked.notifyPermissionAsked;setData={};expandedPlanDays.clear();renderPlan();renderToday();renderSettings();const active=document.querySelector('.page.active');if(active)showPage(active.id.slice(5));toast('Full backup restored');
+    weightUnit=checked.weightUnit;currentDay=checked.currentDay;progressEx=checked.progressEx;notifyPermissionAsked=checked.notifyPermissionAsked;setData={};expandedPlanDays.clear();setupPresets();renderPlan();renderToday();renderSettings();const active=document.querySelector('.page.active');if(active)showPage(active.id.slice(5));toast('Full backup restored');
   }).catch(()=>toast('Could not read backup file'));
 }
 
@@ -763,6 +763,7 @@ function saveCustomPlan(plan) {
   const checked=validatePlan(plan), old=getActivePlan()[currentDay]?.id;
   persistDraft(); save('customPlan',checked);
   const found=checked.findIndex(d=>d.id===old);currentDay=found>=0?found:Math.min(currentDay,checked.length-1);save('currentDay',currentDay);
+  rememberCurrentPlan();
   renderPlan();renderToday();
 }
 
@@ -1033,6 +1034,11 @@ DOT_COLORS.full = '#ffa94d'; DOT_COLORS.home = '#a855f7'; DOT_COLORS.custom = '#
 
 
 
+
+
+
+
+
 let planRenderedMobile=false;
 const expandedPlanDays=new Map();
 
@@ -1249,7 +1255,35 @@ function moveDay(di,delta) {
 
 function renamePlan() {
   const value=document.getElementById('plan-name-input').value.trim();if(!value){toast('Enter a plan name');return;}
-  save('planName',value.slice(0,120));updatePlanTitle();toast('Plan renamed');
+  try{const entry=makeSavedPlan(getSavedPlans(),value.slice(0,120),getActivePlan(),load('activeSavedPlanId',null));replaceStoredData({planName:entry.name,savedPlans:entry.library,activeSavedPlanId:entry.id});}catch{toast('Plan could not be saved');return;}
+  setupPresets();updatePlanTitle();toast('Plan saved to Quick select');
+}
+
+function validateSavedPlans(value) {
+  if(!Array.isArray(value))throw Error('Invalid saved plans');
+  const ids=new Set();return value.map(item=>{
+    if(!item||typeof item.id!=='string'||!item.id||ids.has(item.id)||typeof item.name!=='string'||!item.name.trim())throw Error('Invalid saved plan');
+    ids.add(item.id);return {id:item.id,name:item.name.trim().slice(0,120),plan:validatePlan(item.plan)};
+  });
+}
+
+function getSavedPlans() {
+  try{return validateSavedPlans(load('savedPlans',[]));}catch{return [];}
+}
+
+function makeSavedPlan(library,name,plan,activeId=null) {
+  library=copy(library);name=name.trim().slice(0,120);plan=validatePlan(plan);
+  let entry=library.find(p=>p.id===activeId&&p.name===name)||library.find(p=>p.name===name&&planContents(p.plan)===planContents(plan));
+  if(entry)entry.plan=plan;
+  else{const base=name;let suffix=2,existing;while((existing=library.find(p=>p.name.toLocaleLowerCase()===name.toLocaleLowerCase()))){if(planContents(existing.plan)===planContents(plan)){entry=existing;entry.plan=plan;break;}name=base.slice(0,110)+` (${suffix++})`;}if(!entry){entry={id:uid(),name,plan};library.push(entry);}}
+  return {id:entry.id,name:entry.name,library};
+}
+
+function planContents(plan) { return JSON.stringify(plan,(key,value)=>key==='id'?undefined:value); }
+
+function rememberCurrentPlan() {
+  const entry=makeSavedPlan(getSavedPlans(),load('planName','Big Boy Plan'),getActivePlan(),load('activeSavedPlanId',null));
+  replaceStoredData({savedPlans:entry.library,activeSavedPlanId:entry.id,planName:entry.name});setupPresets();return entry;
 }
 
 function updatePlanTitle() {
@@ -1289,13 +1323,15 @@ function duplicateDay(di) {
 }
 
 function applyPreset(id) {
-  const p=PRESETS.find(p=>p.id===id);if(!p)return;
-  if(!confirm(`Use ${p.name}? Your current plan is replaced; saved history is kept. Export first if you want to keep this plan.`))return;
-  save('customPlan',validatePlan(p.build()));save('planName',p.name);save('workoutDrafts',{});setData={};currentDay=0;save('currentDay',0);renderPlan();renderToday();toast('Plan applied — every day and exercise is editable');
+  const saved=id.startsWith('saved:')?getSavedPlans().find(p=>p.id===id.slice(6)):null,p=saved||PRESETS.find(p=>p.id===id);if(!p)return;
+  if(!confirm(`Use ${p.name}? Your current plan stays in Quick select. Unfinished sets and scheduled adjustments are cleared; saved history is kept.`))return;
+  try{rememberCurrentPlan();const plan=validatePlan(saved?copy(saved.plan):p.build()),entry=makeSavedPlan(getSavedPlans(),p.name,plan,saved?.id);replaceStoredData({customPlan:plan,planName:entry.name,savedPlans:entry.library,activeSavedPlanId:entry.id,workoutDrafts:{},sessionOverrides:{},dismissedCatchups:[],currentDay:0});}catch{toast('Plan could not be applied; your current plan is kept');return;}
+  setData={};currentDay=0;expandedPlanDays.clear();setupPresets();renderPlan();renderToday();toast('Plan applied — every day and exercise is editable');
 }
 
 function setupPresets() {
-  const select=document.getElementById('plan-preset');select.innerHTML='<option value="">Quick select a plan…</option>'+['Gym','Home'].map(group=>`<optgroup label="${group==='Gym'?'Common gym splits':'Home workouts'}">${PRESETS.filter(p=>group==='Gym'?p.equipment==='Gym':p.equipment!=='Gym').map(p=>`<option value="${p.id}">${p.name} · ${p.equipment}</option>`).join('')}</optgroup>`).join('');
+  const select=document.getElementById('plan-preset'),selected=select.value,library=getSavedPlans();select.innerHTML='<option value="">Quick select a plan…</option>'+(library.length?`<optgroup label="Your saved plans">${library.map(p=>`<option value="saved:${h(p.id)}">${h(p.name)} · ${p.plan.length} days</option>`).join('')}</optgroup>`:'')+['Gym','Home'].map(group=>`<optgroup label="${group==='Gym'?'Common gym splits':'Home workouts'}">${PRESETS.filter(p=>group==='Gym'?p.equipment==='Gym':p.equipment!=='Gym').map(p=>`<option value="${p.id}">${p.name} · ${p.equipment}</option>`).join('')}</optgroup>`).join('');
+  if([...select.options].some(option=>option.value===selected))select.value=selected;
 }
 
 function chooseProgress(name) { progressEx=name||null;save('progressEx',progressEx);chartMetric=name?'weight':'sets';renderProgress(); }
@@ -1315,6 +1351,7 @@ function downloadWorkoutJSON(data,filename) {
 }
 
 function exportWorkoutPlan() {
+  try{rememberCurrentPlan();}catch{toast('Could not save plan to Quick select');return;}
   const planName=load('planName','Big Boy Plan');
   downloadWorkoutJSON({kind:'megachad-plan',version:1,exportedAt:new Date().toISOString(),planName,customPlan:getActivePlan()},`workout-plan-${localDateKey(new Date())}.json`);toast('Workout plan exported');
 }
@@ -1336,18 +1373,20 @@ function importWorkoutPlan(event) {
   if(file.size>10000000){toast('Plan is too large (maximum 10 MB)');return;}
   file.text().then(text=>{
     let checked;try{checked=validateWorkoutPlan(JSON.parse(text));}catch(error){toast('Import cancelled: '+error.message);return;}
-    if(!confirm(`Import "${checked.planName}" (${checked.customPlan.length} days)? This replaces your current plan and clears unfinished sets and scheduled adjustments. Your history, stats and body weight stay saved. Export your current plan first if needed.`))return;
-    try{replaceStoredData({...checked,currentDay:0,workoutDrafts:{},sessionOverrides:{},dismissedCatchups:[]});}
+    if(!confirm(`Import "${checked.planName}" (${checked.customPlan.length} days)? Your current plan stays in Quick select. This activates the imported plan and clears unfinished sets and scheduled adjustments. Your history, stats and body weight stay saved.`))return;
+    try{const previous=makeSavedPlan(getSavedPlans(),load('planName','Big Boy Plan'),getActivePlan(),load('activeSavedPlanId',null)),entry=makeSavedPlan(previous.library,checked.planName,checked.customPlan);replaceStoredData({...checked,planName:entry.name,savedPlans:entry.library,activeSavedPlanId:entry.id,currentDay:0,workoutDrafts:{},sessionOverrides:{},dismissedCatchups:[]});}
     catch{toast('Plan could not be saved; previous data was restored');return;}
-    currentDay=0;setData={};expandedPlanDays.clear();renderPlan();renderToday();toast('Workout plan imported');
+    currentDay=0;setData={};expandedPlanDays.clear();setupPresets();renderPlan();renderToday();toast('Workout plan imported and added to Quick select');
   }).catch(()=>toast('Could not read workout plan file'));
 }
 
 function validateBackup(data) {
   if(data?.kind==='megachad-plan')throw Error('This file contains only a plan. Use Import Plan on the Plan page.');
-  if(data?.version>6)throw Error('This backup needs a newer version of the app');
+  if(data?.version>7)throw Error('This backup needs a newer version of the app');
   if(!data||typeof data!=='object'||Array.isArray(data)||!Array.isArray(data.history))throw Error('Not a workout backup');
   const history=validateHistory(data.history),customPlan=data.customPlan==null?validatePlan(copy(PLAN)):validatePlan(data.customPlan);
+  const savedPlans=validateSavedPlans(data.savedPlans??[]);
+  if(data.activeSavedPlanId!=null&&(typeof data.activeSavedPlanId!=='string'||!savedPlans.some(p=>p.id===data.activeSavedPlanId)))throw Error('Invalid active saved plan');
   const log=data.bodyweightLog??[];if(!Array.isArray(log)||log.some(p=>!p||!Number.isFinite(Date.parse(p.date))||!Number.isFinite(Number(p.weight))||Number(p.weight)<=0))throw Error('Invalid body weight log');
   if(data.bodyweight!=null && (!Number.isFinite(Number(data.bodyweight))||Number(data.bodyweight)<=0))throw Error('Invalid body weight');
   const sessionOverrides=validateSessionOverrides(data.sessionOverrides??{},customPlan);if(data.trackingStartedOn!=null&&!validLocalDate(data.trackingStartedOn))throw Error('Invalid tracking start');
@@ -1366,7 +1405,7 @@ function validateBackup(data) {
   }
   if(data.progressEx!=null&&typeof data.progressEx!=='string')throw Error('Invalid progress selection');
   if(data.dismissedCatchups!=null&&(!Array.isArray(data.dismissedCatchups)||data.dismissedCatchups.length>500||data.dismissedCatchups.some(key=>typeof key!=='string')))throw Error('Invalid dismissed suggestions');
-  return {history,customPlan,trackingStartedOn:data.trackingStartedOn??null,sessionOverrides,weeklyGoals:validateWeeklyGoals(data.weeklyGoals??[]),planName:typeof data.planName==='string'&&data.planName.trim()?data.planName.trim().slice(0,120):'My Workout Plan',bodyweight:data.bodyweight==null?null:Number(data.bodyweight),bodyweightLog:log,weightUnit:['kg','lbs'].includes(data.weightUnit)?data.weightUnit:'kg',currentDay:Number.isInteger(data.currentDay)?Math.min(Math.max(data.currentDay,0),customPlan.length-1):0,workoutDrafts:drafts,progressEx:data.progressEx??null,dismissedCatchups:data.dismissedCatchups??[],notifyPermissionAsked:data.notifyPermissionAsked===true};
+  return {history,customPlan,savedPlans,activeSavedPlanId:data.activeSavedPlanId??null,trackingStartedOn:data.trackingStartedOn??null,sessionOverrides,weeklyGoals:validateWeeklyGoals(data.weeklyGoals??[]),planName:typeof data.planName==='string'&&data.planName.trim()?data.planName.trim().slice(0,120):'My Workout Plan',bodyweight:data.bodyweight==null?null:Number(data.bodyweight),bodyweightLog:log,weightUnit:['kg','lbs'].includes(data.weightUnit)?data.weightUnit:'kg',currentDay:Number.isInteger(data.currentDay)?Math.min(Math.max(data.currentDay,0),customPlan.length-1):0,workoutDrafts:drafts,progressEx:data.progressEx??null,dismissedCatchups:data.dismissedCatchups??[],notifyPermissionAsked:data.notifyPermissionAsked===true};
 }
 
 function calculateBackupPRs(history) {
@@ -1705,6 +1744,7 @@ function changeBodyweightUnit(unit) {
 
 function initializeApp() {
   save('customPlan',getActivePlan());currentDay=Math.min(currentDay,getActivePlan().length-1);save('currentDay',currentDay);
+  rememberCurrentPlan();
   setupPresets();recomputePRs();syncWeeklyGoal();renderToday();renderPlan();
   document.addEventListener('click',event=>{const wrapper=document.getElementById('exercise-autocomplete');if(wrapper&&!wrapper.contains(event.target))hideExerciseSuggestions();});
   refreshStreakDate();window.addEventListener('focus',refreshStreakDate);window.addEventListener('pageshow',refreshStreakDate);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshStreakDate();});setInterval(refreshStreakDate,60000);

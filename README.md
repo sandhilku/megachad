@@ -71,3 +71,7 @@ Training templates are editable starting points, not a popularity ranking or a p
 Settings exports/restores all saved app data, including workout history (the source of stats and graphs), records, streak goals and tracking start, body weight, the active plan, unfinished sets, scheduled adjustments, units and saved preferences. Older backups remain supported. Browser notification permissions are controlled by the device.
 
 Plan has compact Export Plan / Import Plan buttons. A plan-only JSON contains its name, days, exercise order, sets and rep targets; no personal history or measurements. Import asks before replacing the plan, clearing unfinished sets and scheduled adjustments. History and measurements stay saved. Use Settings to restore a full backup. Invalid files are rejected before any changes; storage-write failures roll back previous values.
+
+## Saved plans in Quick select
+
+Save Plan adds the named active plan to Your saved plans. Exercise and day edits update its saved entry. Imports also join the list automatically; importing or selecting another plan retains the previous plan in Quick select, while clearing unfinished sets and scheduled adjustments after confirmation. Saved history and measurements stay unchanged. Same-name different plans receive a numbered suffix; identical imports are reused. Existing installations automatically retain their active plan when upgrading. Full backups (version 7) include all saved plans and the active selection; older backups restore their active plan into the list.

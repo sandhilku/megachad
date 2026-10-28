@@ -1241,7 +1241,7 @@
   <div class="section-title">The Plan</div>
   <div class="section-sub">Make every day, exercise and set count your own.</div>
   <div class="plan-transfer"><button type="button" onclick="exportWorkoutPlan()">Export Plan</button><button type="button" onclick="document.getElementById('import-plan-input').click()">Import Plan</button><input id="import-plan-input" type="file" accept=".json,application/json" hidden onchange="importWorkoutPlan(event)"><span>Share just your workout plan.</span></div>
-  <div class="plan-toolbar"><label class="grow">Plan name<input id="plan-name-input" maxlength="120" autocomplete="off"></label><button onclick="renamePlan()">Save name</button></div>
+  <div class="plan-toolbar"><label class="grow">Plan name<input id="plan-name-input" maxlength="120" autocomplete="off"></label><button onclick="renamePlan()">Save Plan</button></div>
   <div class="plan-toolbar"><label class="grow">Quick select<select id="plan-preset"></select></label><button onclick="applyPreset(document.getElementById('plan-preset').value)">Use plan</button><button onclick="openDayEditor()">＋ Add day</button></div>
   <p class="preset-note">Editable starting templates, not a ranking. Gym splits and home options. <a href="https://acsm.org/resistance-training-guidelines-update-2026/" target="_blank" rel="noopener">Training guidance</a> · <a href="https://www.nhs.uk/live-well/exercise/strength-exercises/" target="_blank" rel="noopener">Home exercise guide</a></p>
   <div class="plan-grid" id="plan-grid"></div>
@@ -1284,7 +1284,7 @@
 
   <div class="plan-card" style="padding:20px;margin-bottom:16px;">
     <div class="plan-day-name" style="margin-bottom:10px;">Backup & Restore</div>
-    <div class="plan-focus" style="margin-bottom:14px;">Export everything: workout plan, history, personal records, progress, streaks, body weight, unfinished sets, scheduled adjustments and saved preferences. Restore the backup on another device to continue. For plan-only sharing, use the Plan page.</div>
+    <div class="plan-focus" style="margin-bottom:14px;">Export everything: workout plan, history, personal records, progress, streaks, body weight, unfinished sets, scheduled adjustments, all saved plans and saved preferences. Restore the backup on another device to continue. For plan-only sharing, use the Plan page.</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <button class="modal-btn primary" style="flex:0 0 auto;padding:10px 18px;" onclick="exportData()">Export All Data</button>
       <button class="modal-btn" style="flex:0 0 auto;padding:10px 18px;" onclick="document.getElementById('import-file-input').click()">Restore All Data</button>
@@ -1369,6 +1369,6 @@
   <button class="rest-timer-fab" onclick="toggleRestTimerPanel()">⏱ <span id="rest-timer-fab-time"></span></button>
 </div>
 
-<script src="app.js?v=129cf9953952"></script>
+<script src="app.js?v=2d8c46b9552a"></script>
 </body>
 </html>
