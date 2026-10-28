@@ -209,8 +209,8 @@ function saveBodyweight() {
 
 function exportData() {
   const drafts=getDrafts(),day=getSessionDay();drafts[day.id]=Object.fromEntries(day.exercises.map((e,i)=>[e.id,copy(setData[i]||[])]));
-  const data={version:5,exportedAt:new Date().toISOString(),trackingStartedOn:load('trackingStartedOn',null),sessionOverrides:readSessionOverrides(),weeklyGoals:readWeeklyGoals(),history:load('history',[]),prs:load('prs',{}),customPlan:getActivePlan(),planName:load('planName','Big Boy Plan'),bodyweight:load('bodyweight',null),bodyweightLog:load('bodyweightLog',[]),weightUnit,currentDay,workoutDrafts:drafts};
-  const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=`workout-backup-${localDateKey(new Date())}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Backup exported');
+  const data={version:6,kind:'megachad-backup',exportedAt:new Date().toISOString(),trackingStartedOn:load('trackingStartedOn',null),sessionOverrides:readSessionOverrides(),weeklyGoals:readWeeklyGoals(),history:load('history',[]),prs:load('prs',{}),customPlan:getActivePlan(),planName:load('planName','Big Boy Plan'),bodyweight:load('bodyweight',null),bodyweightLog:load('bodyweightLog',[]),weightUnit,currentDay,workoutDrafts:drafts,progressEx:load('progressEx',null),dismissedCatchups:load('dismissedCatchups',[]),notifyPermissionAsked:load('notifyPermissionAsked',false)};
+  downloadWorkoutJSON(data,`workout-backup-${localDateKey(new Date())}.json`);toast('Full backup exported');
 }
 
 function importData(event) {
@@ -218,12 +218,10 @@ function importData(event) {
   if(file.size>10000000){toast('Backup is too large (maximum 10 MB)');return;}
   file.text().then(text=>{
     let checked;try{checked=validateBackup(JSON.parse(text));}catch(error){toast('Import cancelled: '+error.message);return;}
-    if(!confirm('Replace local workout data with this backup? Export your current data first if needed.'))return;
-    const before={};try{
-      for(const key of Object.keys(checked))before[key]=localStorage.getItem(key);
-      before.prs=localStorage.getItem('prs');
-      Object.entries(checked).forEach(([k,v])=>save(k,v));recomputePRs();weightUnit=checked.weightUnit;currentDay=checked.currentDay;setData={};renderPlan();renderToday();renderSettings();const active=document.querySelector('.page.active');if(active)showPage(active.id.slice(5));toast('Backup imported');
-    }catch{Object.entries(before).forEach(([k,v])=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v);}catch{}});toast('Import could not be saved; previous data was restored');}
+    if(!confirm('Restore this full backup? It replaces your plan, history, stats, streak data, body weight, unfinished sets and saved preferences. Export your current backup first if needed.'))return;
+    try{replaceStoredData({...checked,prs:calculateBackupPRs(checked.history)});}
+    catch{toast('Import could not be saved; previous data was restored');return;}
+    weightUnit=checked.weightUnit;currentDay=checked.currentDay;progressEx=checked.progressEx;notifyPermissionAsked=checked.notifyPermissionAsked;setData={};expandedPlanDays.clear();renderPlan();renderToday();renderSettings();const active=document.querySelector('.page.active');if(active)showPage(active.id.slice(5));toast('Full backup restored');
   }).catch(()=>toast('Could not read backup file'));
 }
 
@@ -1070,6 +1068,12 @@ const PRESETS=[
 
 
 
+
+
+
+
+
+
 // Finish initialization only after definitions, data migration and preset setup.
 // A common-name starter catalogue, not a popularity ranking or training prescription.
 const COMMON_EXERCISES=[
@@ -1306,7 +1310,42 @@ function drawTrend(points,unit,target='progress-chart-wrap',focused=false) {
   document.getElementById(target).innerHTML=`<div class="chart-caption">${h(unit)} · ${points.length===1?'One measurement — keep logging to see a trend':'Actual logged values over time'}${focused?' · Vertical axis fitted to your measurements':''}</div><svg id="${target==='progress-chart-wrap'?'progress-chart':'bw-chart'}" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="${target}-title ${target}-desc"><title id="${target}-title">${focused?'Body weight':'Training progress'} in ${h(unit)}</title><desc id="${target}-desc">${points.length} observations. Starting ${points[0].value}, latest ${points.at(-1).value} ${h(unit)}. Use the data table below for all values.</desc>${grid}${xy.length>1?`<path d="${path} L ${xy.at(-1)[0]},${H-B} L ${xy[0][0]},${H-B} Z" fill="#c8f13513"/><path d="${path}" fill="none" stroke="#c8f135" stroke-width="3"/>`:''}${xy.map(([x,y],i)=>`<circle cx="${x}" cy="${y}" r="5" fill="#c8f135"><title>${h(new Date(points[i].date).toLocaleString())}: ${Number(points[i].value.toFixed(2))} ${h(unit)}</title></circle>`).join('')}<text x="${L}" y="${H-22}" fill="#aaaabb" font-size="12">${format(points[0].date)}</text><text x="${W-R}" y="${H-22}" text-anchor="end" fill="#aaaabb" font-size="12">${span?format(points.at(-1).date):''}</text></svg><details class="chart-table"><summary>View logged data</summary><table><thead><tr><th>Date</th><th>${h(unit)}</th></tr></thead><tbody>${points.map(p=>`<tr><td>${h(new Date(p.date).toLocaleString())}</td><td>${Number(p.value.toFixed(2))}</td></tr>`).join('')}</tbody></table></details>`;
 }
 
+function downloadWorkoutJSON(data,filename) {
+  const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+function exportWorkoutPlan() {
+  const planName=load('planName','Big Boy Plan');
+  downloadWorkoutJSON({kind:'megachad-plan',version:1,exportedAt:new Date().toISOString(),planName,customPlan:getActivePlan()},`workout-plan-${localDateKey(new Date())}.json`);toast('Workout plan exported');
+}
+
+function validateWorkoutPlan(data) {
+  if(!data||data.kind!=='megachad-plan'||data.version!==1)throw Error('Choose a workout plan export. Full backups belong in Settings.');
+  if(typeof data.planName!=='string'||!data.planName.trim())throw Error('Missing plan name');
+  return {customPlan:validatePlan(data.customPlan),planName:data.planName.trim().slice(0,120)};
+}
+
+function replaceStoredData(values) {
+  const before=Object.fromEntries(Object.keys(values).map(key=>[key,localStorage.getItem(key)]));
+  try{Object.entries(values).forEach(([key,value])=>save(key,value));}
+  catch(error){Object.entries(before).forEach(([key,value])=>{try{value===null?localStorage.removeItem(key):localStorage.setItem(key,value);}catch{}});throw error;}
+}
+
+function importWorkoutPlan(event) {
+  const file=event.target.files?.[0];event.target.value='';if(!file)return;
+  if(file.size>10000000){toast('Plan is too large (maximum 10 MB)');return;}
+  file.text().then(text=>{
+    let checked;try{checked=validateWorkoutPlan(JSON.parse(text));}catch(error){toast('Import cancelled: '+error.message);return;}
+    if(!confirm(`Import "${checked.planName}" (${checked.customPlan.length} days)? This replaces your current plan and clears unfinished sets and scheduled adjustments. Your history, stats and body weight stay saved. Export your current plan first if needed.`))return;
+    try{replaceStoredData({...checked,currentDay:0,workoutDrafts:{},sessionOverrides:{},dismissedCatchups:[]});}
+    catch{toast('Plan could not be saved; previous data was restored');return;}
+    currentDay=0;setData={};expandedPlanDays.clear();renderPlan();renderToday();toast('Workout plan imported');
+  }).catch(()=>toast('Could not read workout plan file'));
+}
+
 function validateBackup(data) {
+  if(data?.kind==='megachad-plan')throw Error('This file contains only a plan. Use Import Plan on the Plan page.');
+  if(data?.version>6)throw Error('This backup needs a newer version of the app');
   if(!data||typeof data!=='object'||Array.isArray(data)||!Array.isArray(data.history))throw Error('Not a workout backup');
   const history=validateHistory(data.history),customPlan=data.customPlan==null?validatePlan(copy(PLAN)):validatePlan(data.customPlan);
   const log=data.bodyweightLog??[];if(!Array.isArray(log)||log.some(p=>!p||!Number.isFinite(Date.parse(p.date))||!Number.isFinite(Number(p.weight))||Number(p.weight)<=0))throw Error('Invalid body weight log');
@@ -1325,7 +1364,16 @@ function validateBackup(data) {
     }
     drafts[day.id]=rows;
   }
-  return {history,customPlan,trackingStartedOn:data.trackingStartedOn??null,sessionOverrides,weeklyGoals:validateWeeklyGoals(data.weeklyGoals??[]),planName:typeof data.planName==='string'&&data.planName.trim()?data.planName.trim().slice(0,120):'My Workout Plan',bodyweight:data.bodyweight==null?null:Number(data.bodyweight),bodyweightLog:log,weightUnit:['kg','lbs'].includes(data.weightUnit)?data.weightUnit:'kg',currentDay:Number.isInteger(data.currentDay)?Math.min(Math.max(data.currentDay,0),customPlan.length-1):0,workoutDrafts:drafts};
+  if(data.progressEx!=null&&typeof data.progressEx!=='string')throw Error('Invalid progress selection');
+  if(data.dismissedCatchups!=null&&(!Array.isArray(data.dismissedCatchups)||data.dismissedCatchups.length>500||data.dismissedCatchups.some(key=>typeof key!=='string')))throw Error('Invalid dismissed suggestions');
+  return {history,customPlan,trackingStartedOn:data.trackingStartedOn??null,sessionOverrides,weeklyGoals:validateWeeklyGoals(data.weeklyGoals??[]),planName:typeof data.planName==='string'&&data.planName.trim()?data.planName.trim().slice(0,120):'My Workout Plan',bodyweight:data.bodyweight==null?null:Number(data.bodyweight),bodyweightLog:log,weightUnit:['kg','lbs'].includes(data.weightUnit)?data.weightUnit:'kg',currentDay:Number.isInteger(data.currentDay)?Math.min(Math.max(data.currentDay,0),customPlan.length-1):0,workoutDrafts:drafts,progressEx:data.progressEx??null,dismissedCatchups:data.dismissedCatchups??[],notifyPermissionAsked:data.notifyPermissionAsked===true};
+}
+
+function calculateBackupPRs(history) {
+  const prs=Object.create(null);
+  history.forEach(w=>w.exercises.forEach(e=>e.sets.filter(validSet).forEach(s=>{
+    if(!prs[e.name]||Number(s.weight)>prs[e.name].weight||(Number(s.weight)===prs[e.name].weight&&Number(s.reps)>prs[e.name].reps))prs[e.name]={weight:Number(s.weight),reps:Number(s.reps),date:w.date};
+  })));return prs;
 }
 
 function normalizeExerciseName(name) { return String(name).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim(); }

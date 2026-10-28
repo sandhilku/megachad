@@ -65,3 +65,9 @@ Fixed set-button targeting, bodyweight zero-set logging, stale personal records,
 Validated with 57 automated browser workflows in isolated Edge sessions, including mobile layout, offline reload, direct-file use, weekend make-ups, partial-week grace, missed-week resets, backups, year boundaries, daylight saving, catch-up preview/apply/restore, draft recovery and automatic expiry. A Pixel 5 touch emulation also reproduces cached old CSS/JavaScript alongside new HTML and verifies the upgrade without losing drafts. Physical iOS/Android devices were not tested. Browser notifications can be delayed while a phone suspends the app; the timer catches up on resume.
 
 Training templates are editable starting points, not a popularity ranking or a personalized prescription. References: [ACSM](https://acsm.org/resistance-training-guidelines-update-2026/) and [NHS home strength exercises](https://www.nhs.uk/live-well/exercise/strength-exercises/).
+
+## Full backups and plan sharing
+
+Settings exports/restores all saved app data, including workout history (the source of stats and graphs), records, streak goals and tracking start, body weight, the active plan, unfinished sets, scheduled adjustments, units and saved preferences. Older backups remain supported. Browser notification permissions are controlled by the device.
+
+Plan has compact Export Plan / Import Plan buttons. A plan-only JSON contains its name, days, exercise order, sets and rep targets; no personal history or measurements. Import asks before replacing the plan, clearing unfinished sets and scheduled adjustments. History and measurements stay saved. Use Settings to restore a full backup. Invalid files are rejected before any changes; storage-write failures roll back previous values.

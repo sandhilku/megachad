@@ -16,3 +16,4 @@
 .exercise-name-input-wrap{position:relative}.exercise-name-input-wrap>.modal-input{margin-bottom:0}.exercise-name-suggestions{position:absolute;top:100%;left:0;right:0;z-index:30;box-shadow:0 10px 20px #0006}
 
 .plan-day-summary:focus-visible{outline-offset:-3px}
+.plan-transfer{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 18px}.plan-transfer button{font-size:12px;padding:8px 12px;border:1px solid var(--border);border-radius:7px;background:var(--card);color:var(--text);min-height:40px}.plan-transfer span{font-size:11px;color:var(--muted)}

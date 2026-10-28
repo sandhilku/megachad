@@ -1,5 +1,5 @@
-const CACHE = 'megachad-v9-ed068275ca85-11000aac638e-7509d8a06ea7';
-const ASSETS = ["./", "./index.html", "./app.js?v=ed068275ca85", "./custom.css?v=11000aac638e", "./app.js", "./custom.css", "./manifest.json", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
+const CACHE = 'megachad-v9-129cf9953952-d694c13d9e75-88107ee8e216';
+const ASSETS = ["./", "./index.html", "./app.js?v=129cf9953952", "./custom.css?v=d694c13d9e75", "./app.js", "./custom.css", "./manifest.json", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 self.addEventListener('install',event=>event.waitUntil((async()=>{const cache=await caches.open(CACHE);await cache.addAll(ASSETS.map(url=>new Request(url,{cache:'reload'})));await self.skipWaiting();})()));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{
   const keys=await caches.keys();await Promise.all(keys.filter(k=>(k.startsWith('megachad-')||k==='workout-tracker-v1')&&k!==CACHE).map(k=>caches.delete(k)));
