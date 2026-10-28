@@ -98,3 +98,37 @@ Settings → Usage Analytics lets each browser disable sharing. This preference 
 References: [Umami tracker configuration](https://docs.umami.is/docs/tracker-configuration), [manual tracker functions](https://docs.umami.is/docs/tracker-functions), [Umami Cloud free Hobby plan](https://docs.umami.is/docs/cloud/faq).
 
 Verified with the real public Umami tracker in isolated Edge/Pixel browser tests; all analytics requests were intercepted locally and no test traffic was sent to the owner's dashboard.
+
+## Analytics delivery diagnostics and installed-app recovery
+
+Settings distinguishes sharing permission from delivery. It reports tracker-load failures, offline/local previews, Do Not Track / Global Privacy Control exclusions, Umami's filtered response, HTTP rejection and accepted delivery. "Connected" is shown only after a collection response contains Umami's cache/session confirmation; a checked box or loaded script is not treated as proof of recording.
+
+Check connection sends one allowlisted `Connection Check` event through the same Umami tracker, respecting all privacy exclusions. It creates no workout and no additional pageview. A narrow fetch observer reads a clone of the Umami gateway response without changing requests/responses, logging tokens or inspecting other endpoints. Failed attempts do not mark a pageview as accepted. Pending requests time out in the diagnostic UI after ten seconds.
+
+Installed apps retry a failed/not-yet-delivered visit after reconnecting and retry on subsequent app resumes with a one-minute backoff. Offline workout actions are still not replayed. Saving and editing remain independent of analytics. The phone's actual cause cannot be identified until its delivery check is run; a recent controlled mobile diagnostic to the live site was accepted by Umami.
+
+## Exercise discovery and illustrated guides
+
+Exercises is a new standalone tab, also reachable through Plan → Browse exercises or the Add Exercise editor. An interactive front/back SVG muscle selector and search, equipment and experience filters browse 618 strength/powerlifting exercises with available instructions. Filters match primary and secondary muscles. Results are paginated, and free-text custom exercises still work.
+
+Open a guide for position illustrations, primary/supporting muscles, experience level and step-by-step instructions. Choose any plan day, press Add to this day, edit sets/rep targets, then confirm Add. The intended day is preserved when browsing from its editor, as are already typed set/rep targets. Repeated exercises are blocked within a day but allowed on another day. Adding to a rest day turns it into a custom training day, as with the normal editor. Saved Quick Select entries update through the existing plan-save path.
+
+A validated optional `libraryId` links added exercises to their guide in Plan and Today. It survives plan export/import, full backups, reordering and app reloads; renaming an exercise to a different movement removes the mismatched reference. The full exercise catalogue also expands name suggestions after the user's own plan/history and the existing common exercise names.
+
+The catalogue, search and written instructions are bundled and precached for offline use. Exercise position images load on demand from the source repository at the pinned revision, without a referrer; missing/offline images have a readable fallback. No entire image collection is downloaded or required to install the app. The workflow was inspired by https://github.com/Snouzy/workout-cool; no code or video assets from that project were copied.
+
+Data and image source: https://github.com/yuhonas/free-exercise-db at commit `f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5`, distributed under the Unlicense/public-domain dedication (included as EXERCISE-DATA-LICENSE.txt). The source's entries without instructions and non-strength categories are excluded. This is an exercise reference, not individualized workout programming.
+
+Deployment now requires **exercise-library-data.js** and **EXERCISE-DATA-LICENSE.txt** alongside the previous nine runtime files. The builder versions the data bundle and adds it to the worker's offline cache. Exercise names, muscle selection and instruction views are not sent to analytics; the existing fixed `View Exercises` tab event measures general feature usage only.
+
+Validation includes touch/keyboard muscle selection, combined filters, empty results, illustrated guide layout, selecting the destination day, editable sets/reps, duplicate prevention, editor handoff, guide links, saved plans/backups, offline guides and mobile/desktop layout.
+
+## Detailed anatomy and refined muscle targets
+
+The original block-shaped map has been replaced with curved anatomical SVG paths adapted from Hicham ELABBASSI's MIT-licensed react-native-body-highlighter at revision `8ed39ac2ae9cb46fb79d77eedec7e5b029a75174`. Required copyright/license text is shipped as BODY-MAP-LICENSE.txt and linked in the exercise library. Front and back appear together by default; Front and Back buttons enlarge a single model. The model includes neutral head/hands/feet details and interactive muscles with keyboard/touch support, accessible names, selected states and focus retained after filtering. The deltoid heads are approximate surface selection zones, not an anatomical diagnostic tool.
+
+Front delts (anterior), side delts (lateral), rear delts (posterior) and obliques have distinct exercise filters. Other labels include biceps/triceps brachii, pectorals, latissimus dorsi, rhomboids/middle traps, spinal erectors, gluteus maximus, quadriceps, hip adductors and hip abductors. Lats and rhomboid/middle-trap regions are separate on the back. A Search muscle combobox beneath the map replaces the three deltoid shortcut buttons. It supports common/anatomical aliases, touch and keyboard selection, no-match feedback, clearing and synchronization with map selection and the existing muscle filter. On phones its suggestions open above the field to remain accessible near the keyboard.
+
+The source exercise dataset groups deltoids broadly. An explicit, inspectable ID-to-target table refines supported raises, presses, reverse flyes, rear-delt rows and rotational-core movements; unknown movements remain in the broad original group rather than being assigned a guessed head. Anterior/side/rear filter results differ, primary targets are ordered before secondary involvement, and cards/guides/search use the refined names. References for shoulder-head distinctions: https://www.acefitness.org/resources/pros/expert-articles/9074/smart-shoulder-solutions-an-evidence-based-approach-to-training-the-deltoids/ and https://pmc.ncbi.nlm.nih.gov/articles/PMC7706677/ . No prescriptions or muscle-activation percentages are generated.
+
+The raw geometry snapshot is kept in anatomy-map.json for the local builder, which embeds it into the already versioned exercise-library-data.js bundle. No React or external anatomy service is needed at runtime, and the complete body map works offline. Deployment/ZIP now contains twelve runtime files: the previous eleven plus BODY-MAP-LICENSE.txt. Test coverage includes both views, every refinement ID, distinct delt matches, proper guide labels, keyboard focus retention, actual clipped-region touch targets, saved plan integration and offline installation.

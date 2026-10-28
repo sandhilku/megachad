@@ -242,7 +242,7 @@ function showPage(id) {
   const changed=!page.classList.contains('active');
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p===page));
   document.querySelectorAll('.nav-tab').forEach(b=>b.classList.toggle('active',b.dataset.page===id));
-  ({today:renderToday,history:renderHistory,calendar:renderCalendar,prs:renderPRs,stats:renderStats,progress:renderProgress,bodyweight:renderBodyweight,plan:renderPlan,settings:renderSettings})[id]?.();
+  ({today:renderToday,history:renderHistory,calendar:renderCalendar,prs:renderPRs,stats:renderStats,progress:renderProgress,bodyweight:renderBodyweight,plan:renderPlan,settings:renderSettings,exercises:renderExerciseLibrary})[id]?.();
   if(changed)trackUsage(USAGE_PAGE_EVENTS[id]);
 }
 
@@ -310,6 +310,7 @@ function renderToday() {
           <button type="button" class="ex-toggle" aria-label="Expand or collapse sets" onclick="event.stopPropagation();toggleEx(${ei})">⌄</button>
         </div>
         <div class="sets-panel">
+          ${ex.libraryId?`<button type="button" class="exercise-guide-link" onclick="event.stopPropagation();openLibraryGuideById(getSessionDay().exercises[${ei}].libraryId)">How to do this exercise</button>`:''}
           ${prHint}
           ${lastHint}
           <div class="set-labels">
@@ -778,7 +779,7 @@ function renderPlan() {
   const ids=new Set(plan.map(day=>day.id));for(const id of expandedPlanDays.keys())if(!ids.has(id))expandedPlanDays.delete(id);
   document.getElementById('plan-grid').innerHTML=plan.map((d,di)=>`<details class="plan-card plan-day" data-plan-day="${h(d.id)}" ${!mobile||expandedPlanDays.get(d.id)?'open':''} ontoggle="rememberPlanDay(this)"><summary class="plan-header plan-day-summary"><div style="flex:1;min-width:0"><div class="plan-day-name">${h(d.name)}</div><div class="plan-focus">${h(d.focus)}</div><span class="day-tag ${TYPE_TAGS[d.type].cls}">${TYPE_TAGS[d.type].label}</span><div class="plan-day-count">${d.exercises.length?d.exercises.length+' exercise'+(d.exercises.length===1?'':'s'):d.type==='rest'?'Rest day':'No exercises yet'}</div></div><button class="plan-edit-btn" onclick="event.preventDefault();event.stopPropagation();openDayEditor(${di})" aria-label="Edit day ${di+1}">✎</button><span class="plan-day-chevron" aria-hidden="true">⌄</span></summary>
     <div class="plan-actions"><button onclick="moveDay(${di},-1)" ${di===0?'disabled':''} aria-label="Move day up">↑ Day</button><button onclick="moveDay(${di},1)" ${di===plan.length-1?'disabled':''} aria-label="Move day down">↓ Day</button><button onclick="duplicateDay(${di})">Duplicate</button><button onclick="removeDay(${di})" ${plan.length===1?'disabled':''}>Remove day</button><button onclick="openAddExercise(${di})">＋ Exercise</button></div>
-    <div class="plan-exercises">${d.exercises.map((e,ei)=>`<div class="plan-ex customizable"><div class="plan-ex-name">${h(e.name)}<small>${h(e.reps)} reps${e.bodyweight?' · bodyweight':''}</small></div><label class="inline-set-label"><input type="number" class="inline-sets" min="1" max="100" step="1" aria-label="Sets for ${h(e.name)}" value="${e.sets}" onchange="setExerciseCount(${di},${ei},this.value)"> sets</label><div class="reorder-buttons"><button onclick="moveExercise(${di},${ei},-1)" ${ei===0?'disabled':''} aria-label="Move ${h(e.name)} up">↑</button><button onclick="moveExercise(${di},${ei},1)" ${ei===d.exercises.length-1?'disabled':''} aria-label="Move ${h(e.name)} down">↓</button><button onclick="openEditExercise(${di},${ei})" aria-label="Edit ${h(e.name)}">✎</button><button onclick="removeExercise(${di},${ei})" aria-label="Remove ${h(e.name)}">×</button></div></div>`).join('')||'<p class="empty-day">Recovery day, or add your first exercise.</p>'}</div></details>`).join('');
+    <div class="plan-exercises">${d.exercises.map((e,ei)=>`<div class="plan-ex customizable"><div class="plan-ex-name">${h(e.name)}<small>${h(e.reps)} reps${e.bodyweight?' · bodyweight':''}</small></div><label class="inline-set-label"><input type="number" class="inline-sets" min="1" max="100" step="1" aria-label="Sets for ${h(e.name)}" value="${e.sets}" onchange="setExerciseCount(${di},${ei},this.value)"> sets</label><div class="reorder-buttons">${e.libraryId?`<button onclick="openLibraryGuideById(getActivePlan()[${di}].exercises[${ei}].libraryId,${di})">Guide</button>`:''}<button onclick="moveExercise(${di},${ei},-1)" ${ei===0?'disabled':''} aria-label="Move ${h(e.name)} up">↑</button><button onclick="moveExercise(${di},${ei},1)" ${ei===d.exercises.length-1?'disabled':''} aria-label="Move ${h(e.name)} down">↓</button><button onclick="openEditExercise(${di},${ei})" aria-label="Edit ${h(e.name)}">✎</button><button onclick="removeExercise(${di},${ei})" aria-label="Remove ${h(e.name)}">×</button></div></div>`).join('')||'<p class="empty-day">Recovery day, or add your first exercise.</p>'}</div></details>`).join('');
 }
 
 let editingDayIndex = null;
@@ -801,8 +802,8 @@ function confirmAddExercise() {
   if(editingExIndex!=null){
     if(editingDayIndex===currentDay&&sets<day.exercises[editingExIndex].sets&&(setData[editingExIndex]||[]).slice(sets).some(s=>s.reps!==''||s.done)&&!confirm('This removes entered sets from the current draft. Continue?'))return;
     day.exercises[editingExIndex]={...day.exercises[editingExIndex],name,sets,reps,...(selectedExerciseTemplate&&exerciseNameKey(selectedExerciseTemplate.name)===exerciseNameKey(name)&&selectedExerciseTemplate.bodyweight!=null?{bodyweight:!!selectedExerciseTemplate.bodyweight}:{})};
-  } else {const template=selectedExerciseTemplate&&exerciseNameKey(selectedExerciseTemplate.name)===exerciseNameKey(name)?selectedExerciseTemplate:null;day.exercises.push({id:uid(),name,sets,reps,bodyweight:template?.bodyweight??day.type==='home'});if(day.type==='rest'){day.type='custom';day.focus='Custom workout';}}
-  saveCustomPlan(plan);closeAddExercise();toast('Exercise saved');
+  } else {const template=selectedExerciseTemplate&&exerciseNameKey(selectedExerciseTemplate.name)===exerciseNameKey(name)?selectedExerciseTemplate:null;day.exercises.push({id:uid(),name,sets,reps,bodyweight:template?.bodyweight??day.type==='home',...(template?.libraryId?{libraryId:template.libraryId}:{})});if(day.type==='rest'){day.type='custom';day.focus='Custom workout';}}
+  saveCustomPlan(plan);closeAddExercise();if(document.getElementById('page-exercises').classList.contains('active'))renderExerciseLibrary();toast('Exercise saved');
 }
 
 function removeExercise(di,ei) {
@@ -1111,6 +1112,49 @@ let exerciseCatalog=[],exerciseSuggestionRows=[],exerciseSuggestionActive=-1,sel
 
 
 
+const LIBRARY_MUSCLES={'chest':'Chest (pectorals)','front-delts':'Front delts (anterior)','side-delts':'Side delts (lateral)','rear-delts':'Rear delts (posterior)','shoulders':'All deltoids','biceps':'Biceps brachii','triceps':'Triceps brachii','forearms':'Forearms','abdominals':'Abdominals (abs)','obliques':'Obliques','quadriceps':'Quadriceps','hamstrings':'Hamstrings','glutes':'Gluteus maximus','calves':'Calves','lats':'Lats (latissimus dorsi)','middle back':'Rhomboids / middle traps','lower back':'Spinal erectors','traps':'Upper trapezius','abductors':'Hip abductors','adductors':'Hip adductors','neck':'Neck muscles'};
+// Explicit movement tags refine the source catalogue's broad shoulder/core groups.
+// Untagged exercises stay discoverable under the original broad groups.
+const LIBRARY_FOCUS_GROUPS={
+ 'front-delts':['Front_Cable_Raise','Front_Dumbbell_Raise','Front_Incline_Dumbbell_Raise','Front_Plate_Raise','Front_Two-Dumbbell_Raise','Standing_Dumbbell_Straight-Arm_Front_Delt_Raise_Above_Head','Standing_Front_Barbell_Raise_Over_Head','Straight_Raises_on_Incline_Bench','Alternating_Deltoid_Raise','Side_Laterals_to_Front_Raise','Alternating_Cable_Shoulder_Press','Alternating_Kettlebell_Press','Arnold_Dumbbell_Press','Barbell_Shoulder_Press','Cable_Shoulder_Press','Dumbbell_One-Arm_Shoulder_Press','Dumbbell_Shoulder_Press','Handstand_Push-Ups','Kettlebell_Arnold_Press','Kettlebell_Seated_Press','Leverage_Shoulder_Press','Machine_Shoulder_Military_Press','Seated_Barbell_Military_Press','Seated_Cable_Shoulder_Press','Seated_Dumbbell_Press','Shoulder_Press_-_With_Bands','Smith_Machine_Overhead_Shoulder_Press','Standing_Alternating_Dumbbell_Press','Standing_Dumbbell_Press','Standing_Military_Press','Standing_Palm-In_One-Arm_Dumbbell_Press','Standing_Palms-In_Dumbbell_Press','Two-Arm_Kettlebell_Military_Press','Barbell_Bench_Press_-_Medium_Grip','Barbell_Incline_Bench_Press_-_Medium_Grip','Dumbbell_Bench_Press','Pushups'],
+ 'side-delts':['Cable_Seated_Lateral_Raise','Dumbbell_One-Arm_Upright_Row','Lateral_Raise_-_With_Bands','Lying_One-Arm_Lateral_Raise','One-Arm_Incline_Lateral_Raise','One-Arm_Side_Laterals','Power_Partials','Seated_Side_Lateral_Raise','Side_Lateral_Raise','Side_Laterals_to_Front_Raise','Smith_Machine_One-Arm_Upright_Row','Standing_Low-Pulley_Deltoid_Raise','Upright_Barbell_Row','Alternating_Deltoid_Raise','Alternating_Cable_Shoulder_Press','Alternating_Kettlebell_Press','Arnold_Dumbbell_Press','Barbell_Shoulder_Press','Cable_Shoulder_Press','Dumbbell_One-Arm_Shoulder_Press','Dumbbell_Shoulder_Press','Kettlebell_Arnold_Press','Kettlebell_Seated_Press','Leverage_Shoulder_Press','Machine_Shoulder_Military_Press','Seated_Barbell_Military_Press','Seated_Cable_Shoulder_Press','Seated_Dumbbell_Press','Shoulder_Press_-_With_Bands','Smith_Machine_Overhead_Shoulder_Press','Standing_Alternating_Dumbbell_Press','Standing_Dumbbell_Press','Standing_Military_Press','Standing_Palm-In_One-Arm_Dumbbell_Press','Standing_Palms-In_Dumbbell_Press','Two-Arm_Kettlebell_Military_Press'],
+ 'rear-delts':['Back_Flyes_-_With_Bands','Band_Pull_Apart','Barbell_Rear_Delt_Row','Bent_Over_Dumbbell_Rear_Delt_Raise_With_Head_On_Bench','Bent_Over_Low-Pulley_Side_Lateral','Cable_Rear_Delt_Fly','Cable_Rope_Rear-Delt_Rows','Dumbbell_Lying_One-Arm_Rear_Lateral_Raise','Dumbbell_Lying_Rear_Lateral_Raise','Face_Pull','Low_Pulley_Row_To_Neck','Lying_Rear_Delt_Raise','Reverse_Flyes','Reverse_Flyes_With_External_Rotation','Reverse_Machine_Flyes','Seated_Bent-Over_Rear_Delt_Raise','Sled_Reverse_Flye'],
+ 'obliques':['Barbell_Side_Bend','Bosu_Ball_Cable_Crunch_With_Side_Bends','Cable_Judo_Flip','Cable_Russian_Twists','Decline_Oblique_Crunch','Dumbbell_Side_Bend','Kneeling_Cable_Crunch_With_Alternating_Oblique_Twists','Oblique_Crunches','Oblique_Crunches_-_On_The_Floor','One-Arm_High-Pulley_Cable_Side_Bends','Push_Up_to_Side_Plank','Russian_Twist','Weighted_Ball_Side_Bend']
+};
+const LIBRARY_FOCUS_LOOKUP=new Map();
+Object.entries(LIBRARY_FOCUS_GROUPS).forEach(([target,ids])=>ids.forEach(id=>LIBRARY_FOCUS_LOOKUP.set(id,[...(LIBRARY_FOCUS_LOOKUP.get(id)||[]),target])));
+
+
+
+const LIBRARY_FEATURED=['Dumbbell_Bench_Press','Barbell_Bench_Press_-_Medium_Grip','Pushups','Pullups','Barbell_Squat','Lat_Pulldown','Seated_Cable_Rows','Dumbbell_Bicep_Curl','Dumbbell_Shoulder_Press','Leg_Press'];
+let libraryMuscle='',libraryEquipment='',libraryLevel='',libraryQuery='',libraryLimit=24,libraryView='both',libraryTargetDay='',libraryGuideIndex=null,libraryGuideFocus=null,libraryDraft=null;
+
+
+
+
+
+let muscleSearchRows=[],muscleSearchActive=-1;
+const MUSCLE_SEARCH_ALIASES={'front-delts':'front shoulders anterior deltoids','side-delts':'side shoulders medial lateral deltoids','rear-delts':'rear shoulders back shoulders posterior deltoids','shoulders':'shoulder all delts','middle back':'upper back rhomboids mid traps','lower back':'lower back erector spinae','traps':'upper traps trapezius','quadriceps':'quads thigh front legs','hamstrings':'back legs hamstring','glutes':'glutes glute gluteals buttocks','abdominals':'abs core six pack','calves':'calf gastrocnemius soleus','abductors':'outer hips glute medius','adductors':'inner thighs','lats':'lat latissimus back'};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1166,9 +1210,12 @@ let editingWeightId=null;
 // Owner setup: copy the public website ID from Umami's Tracking code.
 // Leave websiteId empty until provided. No API keys belong here.
 const USAGE_CONFIG=Object.freeze({websiteId:'13928003-0448-4537-979d-b70a50422747',scriptUrl:'https://cloud.umami.is/script.js',hostname:'sandhilku.github.io',path:'/megachad/'});
-const USAGE_PAGE_EVENTS=Object.freeze({today:'View Today',history:'View History',calendar:'View Calendar',prs:'View PRs',stats:'View Stats',progress:'View Progress',bodyweight:'View Body Weight',plan:'View Plan',settings:'View Settings'});
-const USAGE_EVENTS=new Set(['pageview','Workout Saved','First Workout Saved','Plan Saved','Plan Imported','Plan Applied',...Object.values(USAGE_PAGE_EVENTS)]);
-let usageLoading=false,usageReady=false,usageFailed=false,usageVisitSent=false,usageQueue=[];
+const USAGE_PAGE_EVENTS=Object.freeze({today:'View Today',history:'View History',calendar:'View Calendar',prs:'View PRs',stats:'View Stats',progress:'View Progress',bodyweight:'View Body Weight',plan:'View Plan',settings:'View Settings',exercises:'View Exercises'});
+const USAGE_EVENTS=new Set(['pageview','Connection Check','Workout Saved','First Workout Saved','Plan Saved','Plan Imported','Plan Applied',...Object.values(USAGE_PAGE_EVENTS)]);
+let usageLoading=false,usageReady=false,usageFailed=false,usageVisitSent=false,usageVisitPending=false,usageQueue=[],usageDelivery='',usageLastAttempt=0,usageObserved=false,usageRequestId=0;
+
+
+
 
 
 
@@ -1195,7 +1242,8 @@ function validatePlan(plan) {
       if (names.has(key)) throw Error('Exercise names must be unique within a day'); names.add(key);
       const exid=typeof e.id==='string' && e.id && !ids.has(e.id) ? e.id : id+'-ex-'+ei;
       if(ids.has(exid)) throw Error('Duplicate exercise ID'); ids.add(exid);
-      return {id:exid,name,sets:Number(e.sets),reps:e.reps.trim().slice(0,80),bodyweight:!!e.bodyweight};
+      const guide=typeof e.libraryId==='string'?EXERCISE_LIBRARY.find(item=>item.id===e.libraryId&&item.name.toLocaleLowerCase()===name.toLocaleLowerCase()):null;
+      return {id:exid,name,sets:Number(e.sets),reps:e.reps.trim().slice(0,80),bodyweight:!!e.bodyweight,...(guide?{libraryId:guide.id}:{})};
     })};
   });
 }
@@ -1438,10 +1486,11 @@ function exerciseNameKey(name) { return normalizeExerciseName(name).replace(/\s/
 
 function buildExerciseCatalog() {
   const entries=new Map();
-  const add=(name,data)=>{const key=exerciseNameKey(name);if(!key)return;const existing=entries.get(key);if(existing){existing.aliases.push(...(data.aliases||[]));if(existing.bodyweight==null&&data.bodyweight!=null)existing.bodyweight=data.bodyweight;return;}entries.set(key,{name,...data,aliases:data.aliases||[]});};
-  getActivePlan().forEach(d=>d.exercises.forEach(e=>add(e.name,{source:'Your plan',detail:d.name,priority:0,sets:e.sets,reps:e.reps,bodyweight:e.bodyweight})));
+  const add=(name,data)=>{const key=exerciseNameKey(name);if(!key)return;const existing=entries.get(key);if(existing){existing.aliases.push(...(data.aliases||[]));if(existing.bodyweight==null&&data.bodyweight!=null)existing.bodyweight=data.bodyweight;if(!existing.libraryId&&data.libraryId)existing.libraryId=data.libraryId;return;}entries.set(key,{name,...data,aliases:data.aliases||[]});};
+  getActivePlan().forEach(d=>d.exercises.forEach(e=>add(e.name,{source:'Your plan',detail:d.name,priority:0,sets:e.sets,reps:e.reps,bodyweight:e.bodyweight,libraryId:e.libraryId})));
   [...load('history',[])].sort((a,b)=>Date.parse(b.date)-Date.parse(a.date)).forEach(w=>w.exercises.forEach(e=>add(e.name,{source:'Your history',detail:'Previously logged',priority:1,bodyweight:null})));
   COMMON_EXERCISES.forEach(([category,...items])=>items.forEach(item=>{const [name,aliases='']=item.split('|');add(name,{source:'Common exercises',detail:category,priority:2,bodyweight:category==='Home · bodyweight',aliases:aliases.split(';').filter(Boolean)});}));
+  EXERCISE_LIBRARY.forEach(e=>add(e.name,{source:'Exercise library',detail:e.primaryMuscles.join(', '),priority:3,bodyweight:e.equipment==='body only',libraryId:e.id}));
   return [...entries.values()];
 }
 
@@ -1453,6 +1502,7 @@ function findExerciseSuggestions(query) {
 function openExerciseEditor(dayIndex,exIndex) {
   const day=getActivePlan()[dayIndex],exercise=exIndex==null?null:day?.exercises[exIndex];if(!day||exIndex!=null&&!exercise)return;
   editingDayIndex=dayIndex;editingExIndex=exIndex;selectedExerciseTemplate=null;exerciseCatalog=buildExerciseCatalog();
+  document.getElementById('browse-exercises-editor').hidden=exIndex!==null;
   document.getElementById('add-ex-modal-title').textContent=exercise?'Edit Exercise':'Add Exercise';document.getElementById('add-ex-confirm-btn').textContent=exercise?'Save':'Add';document.getElementById('add-ex-day-name').textContent=day.name;document.getElementById('add-ex-name').value=exercise?.name||'';document.getElementById('add-ex-sets').value=exercise?.sets??'';document.getElementById('add-ex-reps').value=exercise?.reps||'';
   document.getElementById('add-ex-modal').classList.add('open');document.getElementById('add-ex-name').focus({preventScroll:true});renderExerciseSuggestions();
 }
@@ -1485,6 +1535,175 @@ function exerciseSuggestionKey(event) {
   if(!['ArrowDown','ArrowUp'].includes(event.key))return;event.preventDefault();if(list.hidden)renderExerciseSuggestions();if(!exerciseSuggestionRows.length)return;
   exerciseSuggestionActive=exerciseSuggestionActive<0?(event.key==='ArrowDown'?0:exerciseSuggestionRows.length-1):(exerciseSuggestionActive+(event.key==='ArrowDown'?1:exerciseSuggestionRows.length-1)+exerciseSuggestionRows.length)%exerciseSuggestionRows.length;
   list.querySelectorAll('[role="option"]').forEach((element,i)=>element.setAttribute('aria-selected',String(i===exerciseSuggestionActive)));const option=document.getElementById('exercise-name-option-'+exerciseSuggestionActive);input.setAttribute('aria-activedescendant',option.id);option.scrollIntoView({block:'nearest'});
+}
+
+function libraryHasMuscle(e,key) { const refined=LIBRARY_FOCUS_LOOKUP.get(e.id)||[];return e.primaryMuscles.includes(key)||e.secondaryMuscles.includes(key)||refined.includes(key)||(key==='shoulders'&&refined.some(t=>t.endsWith('-delts'))); }
+
+function libraryPrimaryTarget(e,key) { return e.primaryMuscles.includes(key)||((LIBRARY_FOCUS_LOOKUP.get(e.id)||[]).includes(key)&&(key==='obliques'?e.primaryMuscles.includes('abdominals'):e.primaryMuscles.includes('shoulders'))); }
+
+function libraryMuscleNames(e,secondary=false) {
+  const refined=LIBRARY_FOCUS_LOOKUP.get(e.id)||[],names=[];
+  for(const key of secondary?e.secondaryMuscles:e.primaryMuscles){
+    const targets=key==='shoulders'?refined.filter(t=>t.endsWith('-delts')):key==='abdominals'?refined.filter(t=>t==='obliques'):[];
+    names.push(...(targets.length?targets.map(t=>LIBRARY_MUSCLES[t]):[LIBRARY_MUSCLES[key]||key]));
+  }
+  return [...new Set(names)];
+}
+
+function openExerciseLibrary(dayIndex=null) {
+  const plan=getActivePlan(),index=dayIndex??editingDayIndex??currentDay;
+  libraryDraft=editingDayIndex!==null&&editingExIndex===null?{dayId:plan[index]?.id,sets:document.getElementById('add-ex-sets').value,reps:document.getElementById('add-ex-reps').value}:null;
+  if(plan[index])libraryTargetDay=plan[index].id;
+  closeAddExercise();showPage('exercises');document.getElementById('library-search').focus({preventScroll:true});
+}
+
+function libraryDayOptions(selected) {
+  return getActivePlan().map(d=>`<option value="${h(d.id)}" ${d.id===selected?'selected':''}>${h(d.name)}${d.type==='rest'?' · rest day':''}</option>`).join('');
+}
+
+function renderExerciseLibrary() {
+  const plan=getActivePlan();if(!plan.some(d=>d.id===libraryTargetDay))libraryTargetDay=plan[currentDay]?.id||plan[0].id;
+  document.getElementById('library-target-day').innerHTML=libraryDayOptions(libraryTargetDay);
+  document.getElementById('library-search').value=libraryQuery;
+  document.getElementById('library-muscle').innerHTML='<option value="">All muscles</option>'+Object.entries(LIBRARY_MUSCLES).map(([key,label])=>`<option value="${key}" ${libraryMuscle===key?'selected':''}>${label}</option>`).join('');
+  document.getElementById('library-equipment').innerHTML='<option value="">All equipment</option>'+[...new Set(EXERCISE_LIBRARY.map(e=>e.equipment||'other'))].sort().map(key=>`<option value="${h(key)}" ${libraryEquipment===key?'selected':''}>${h(key==='body only'?'Bodyweight / no equipment':key)}</option>`).join('');
+  document.getElementById('library-level').value=libraryLevel;renderLibraryBody();renderLibraryResults();
+}
+
+function setLibraryFilter(key,value) {
+  if(key==='muscle'){libraryMuscle=value;if(libraryView!=='both'){if(['rear-delts','lats','middle back','lower back','glutes','hamstrings'].includes(value))libraryView='back';if(['front-delts','chest','biceps','abdominals','quadriceps'].includes(value))libraryView='front';}}
+  if(key==='equipment')libraryEquipment=value;
+  if(key==='level')libraryLevel=value;
+  if(key==='query')libraryQuery=value;
+  libraryLimit=24;document.getElementById('library-muscle').value=libraryMuscle;renderLibraryBody();renderLibraryResults();
+}
+
+function selectLibraryMuscle(key) { setLibraryFilter('muscle',libraryMuscle===key?'':key); }
+
+function renderMuscleSearch() {
+  const input=document.getElementById('muscle-search-input'),list=document.getElementById('muscle-search-options'),query=normalizeExerciseName(input.value),tokens=query.split(' ').filter(Boolean);
+  if(!query&&libraryMuscle)setLibraryFilter('muscle','');
+  muscleSearchRows=Object.entries(LIBRARY_MUSCLES).filter(([key,label])=>tokens.every(token=>normalizeExerciseName(key+' '+label+' '+(MUSCLE_SEARCH_ALIASES[key]||'')).includes(token))).sort((a,b)=>Number(normalizeExerciseName(b[1]).startsWith(query))-Number(normalizeExerciseName(a[1]).startsWith(query))).slice(0,8);
+  muscleSearchActive=-1;input.removeAttribute('aria-activedescendant');
+  list.innerHTML=muscleSearchRows.length?muscleSearchRows.map(([key,label],index)=>`<button type="button" id="muscle-search-option-${index}" role="option" aria-selected="false" tabindex="-1" onmousedown="event.preventDefault()" onclick="chooseMuscleSearch(${index})">${h(label)}</button>`).join(''):'<p>No matching muscle. Try a shorter name.</p>';
+  list.hidden=false;input.setAttribute('aria-expanded','true');document.getElementById('muscle-search-status').textContent=muscleSearchRows.length?`${muscleSearchRows.length} muscle suggestions.`:'No matching muscle.';
+}
+
+function hideMuscleSearch() {
+  const list=document.getElementById('muscle-search-options'),input=document.getElementById('muscle-search-input');if(!list||!input)return;list.hidden=true;input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');muscleSearchActive=-1;
+}
+
+function chooseMuscleSearch(index) {
+  const row=muscleSearchRows[index];if(!row)return;setLibraryFilter('muscle',row[0]);const input=document.getElementById('muscle-search-input');input.focus({preventScroll:true});hideMuscleSearch();document.getElementById('muscle-search-status').textContent='Selected '+row[1]+'.';
+}
+
+function muscleSearchKey(event) {
+  const list=document.getElementById('muscle-search-options'),input=document.getElementById('muscle-search-input');
+  if(event.key==='Tab'){hideMuscleSearch();return;}
+  if(event.key==='Escape'){event.preventDefault();event.stopPropagation();hideMuscleSearch();return;}
+  if(event.key==='Enter'&&!list.hidden){event.preventDefault();if(muscleSearchRows.length)chooseMuscleSearch(muscleSearchActive<0?0:muscleSearchActive);return;}
+  if(!['ArrowDown','ArrowUp'].includes(event.key))return;event.preventDefault();if(list.hidden)renderMuscleSearch();if(!muscleSearchRows.length)return;
+  muscleSearchActive=muscleSearchActive<0?(event.key==='ArrowDown'?0:muscleSearchRows.length-1):(muscleSearchActive+(event.key==='ArrowDown'?1:muscleSearchRows.length-1))%muscleSearchRows.length;
+  list.querySelectorAll('[role=option]').forEach((option,index)=>option.setAttribute('aria-selected',String(index===muscleSearchActive)));const option=document.getElementById('muscle-search-option-'+muscleSearchActive);input.setAttribute('aria-activedescendant',option.id);option.scrollIntoView({block:'nearest'});
+}
+
+function setLibraryView(view) { libraryView=['front','back','both'].includes(view)?view:'both';renderLibraryBody(); }
+
+function changeLibraryTarget(id) {
+  if(!getActivePlan().some(d=>d.id===id))return;libraryTargetDay=id;document.getElementById('library-target-day').value=id;renderLibraryResults();if(libraryGuideIndex!==null)refreshGuideDestination();
+}
+
+function libraryMatches() {
+  const tokens=normalizeExerciseName(libraryQuery).split(' ').filter(Boolean);
+  return EXERCISE_LIBRARY.map((e,index)=>({e,index})).filter(({e})=>(!libraryMuscle||libraryHasMuscle(e,libraryMuscle))&&(!libraryEquipment||(e.equipment||'other')===libraryEquipment)&&(!libraryLevel||e.level===libraryLevel)&&tokens.every(t=>normalizeExerciseName([e.name,e.equipment,...e.primaryMuscles,...e.secondaryMuscles,...libraryMuscleNames(e),...libraryMuscleNames(e,true),...(LIBRARY_FOCUS_LOOKUP.get(e.id)||[])].join(' ')).includes(t))).sort((a,b)=>{
+    if(libraryMuscle){const delta=Number(libraryPrimaryTarget(b.e,libraryMuscle))-Number(libraryPrimaryTarget(a.e,libraryMuscle));if(delta)return delta;}
+    const featured=e=>{const i=LIBRARY_FEATURED.indexOf(e.id);return i<0?100:i;};return featured(a.e)-featured(b.e)||a.e.name.localeCompare(b.e.name);
+  });
+}
+
+function libraryAlreadyAdded(e) {
+  const day=getActivePlan().find(d=>d.id===libraryTargetDay);return !!day?.exercises.some(ex=>ex.libraryId===e.id||exerciseNameKey(ex.name)===exerciseNameKey(e.name));
+}
+
+function renderLibraryResults() {
+  const matches=libraryMatches(),shown=matches.slice(0,libraryLimit);
+  document.getElementById('library-results-count').textContent=`${matches.length} exercise${matches.length===1?'':'s'}${libraryMuscle?' for '+LIBRARY_MUSCLES[libraryMuscle]:''} · showing ${shown.length}`;
+  document.getElementById('library-results').innerHTML=shown.map(({e,index})=>`<article class="library-exercise"><div class="library-card-top"><span class="library-muscle-badge">${h(libraryMuscleNames(e)[0]||'Strength')}</span><span class="library-level">${h(e.level)}</span></div><h2>${h(e.name)}</h2><p>${h(e.equipment==='body only'?'Bodyweight':e.equipment||'Other equipment')}</p><p class="library-muscles">${h(libraryMuscleNames(e).join(' · '))}</p><button type="button" onclick="openExerciseGuide(${index})">${libraryAlreadyAdded(e)?'In this day · View guide':'How to & add'}</button></article>`).join('')||'<div class="library-empty"><h2>No exercises match</h2><p>Try another muscle, equipment option or a shorter name.</p><button onclick="clearLibraryFilters()">Clear filters</button></div>';
+  const more=document.getElementById('library-load-more');more.hidden=shown.length>=matches.length;more.textContent=`Show more (${Math.max(0,matches.length-shown.length)} left)`;
+}
+
+function clearLibraryFilters() {
+  libraryMuscle='';libraryEquipment='';libraryLevel='';libraryQuery='';libraryLimit=24;renderExerciseLibrary();
+}
+
+function libraryMuscleKey(event,key) {
+  if(event.key==='Enter'||event.key===' '){event.preventDefault();selectLibraryMuscle(key);}
+}
+
+function renderLibraryBody() {
+  const focused=document.activeElement?.closest?.('.library-body-region'),focusId=focused?.id;
+  const sides=libraryView==='both'?['front','back']:[libraryView];
+  document.getElementById('library-body').innerHTML=sides.map(renderAnatomyModel).join('');
+  if(focusId)document.getElementById(focusId)?.focus({preventScroll:true});
+  document.querySelectorAll('[data-body-view]').forEach(button=>{button.classList.toggle('active',button.dataset.bodyView===libraryView);button.setAttribute('aria-pressed',String(button.dataset.bodyView===libraryView));});
+  const muscleInput=document.getElementById('muscle-search-input');if(muscleInput)muscleInput.value=libraryMuscle?LIBRARY_MUSCLES[libraryMuscle]:'';hideMuscleSearch();
+  document.getElementById('library-selected-muscle').textContent=libraryMuscle?LIBRARY_MUSCLES[libraryMuscle]:'Tap a muscle to explore';
+}
+
+function renderAnatomyRegion(side,key,paths,clip='') {
+  const selected=libraryMuscle===key||(libraryMuscle==='shoulders'&&key.endsWith('-delts'));
+  return `<g id="anatomy-${side}-${key.replace(/ /g,'-')}" data-muscle="${key}" class="library-body-region ${selected?'selected':''}" role="button" tabindex="0" aria-label="${h(LIBRARY_MUSCLES[key])}" aria-pressed="${selected}" onclick="selectLibraryMuscle('${key}')" onkeydown="libraryMuscleKey(event,'${key}')" ${clip?`clip-path="url(#${side}-${clip})"`:''}><title>${h(LIBRARY_MUSCLES[key])}</title>${paths.map(d=>`<path d="${d}"/>`).join('')}</g>`;
+}
+
+function renderAnatomyModel(side) {
+  const regions=[],neutral=[],mapping={chest:'chest',obliques:'obliques',abs:'abdominals',biceps:'biceps',triceps:'triceps',neck:'neck',trapezius:'traps',adductors:'adductors',quadriceps:'quadriceps',calves:'calves',forearm:'forearms','lower-back':'lower back',gluteal:'glutes',hamstring:'hamstrings'};
+  for(const part of LIBRARY_BODY_SHAPES[side]){
+    const paths=Object.values(part.path).flat();
+    if(part.slug==='deltoids'){
+      regions.push(renderAnatomyRegion(side,side==='front'?'front-delts':'rear-delts',paths,'delt-main'),renderAnatomyRegion(side,'side-delts',paths,'delt-side'));
+    }else if(part.slug==='upper-back'){
+      regions.push(renderAnatomyRegion(side,'lats',[part.path.left[1],part.path.right[2]]),renderAnatomyRegion(side,'middle back',[part.path.left[0],part.path.left[2],part.path.right[0],part.path.right[1]]));
+    }else if(mapping[part.slug])regions.push(renderAnatomyRegion(side,mapping[part.slug],paths));
+    else neutral.push(...paths.map(d=>`<path class="anatomy-neutral" d="${d}"/>`));
+  }
+  const rects=side==='front'?{main:[[238,300,50,115],[440,300,44,115]],side:[[180,300,58,115],[484,300,60,115]]}:{main:[[944,300,45,110],[1180,300,44,110]],side:[[900,300,44,110],[1224,300,42,110]]};
+  return `<figure class="anatomy-figure"><svg viewBox="${side==='front'?'0':'724'} 70 724 1320" data-body-side="${side}" role="group" aria-label="${side==='front'?'Front':'Back'} muscle selector"><defs>${Object.entries(rects).map(([name,rectangles])=>`<clipPath id="${side}-delt-${name}">${rectangles.map(([x,y,width,height])=>`<rect x="${x}" y="${y}" width="${width}" height="${height}"/>`).join('')}</clipPath>`).join('')}</defs><path class="anatomy-outline" d="${LIBRARY_BODY_SHAPES.outlines[side==='front'?0:1]}"/>${neutral.join('')}${regions.join('')}</svg><figcaption>${side==='front'?'Anterior · front':'Posterior · back'}</figcaption></figure>`;
+}
+
+function openLibraryGuideById(id,dayIndex=currentDay) {
+  const index=EXERCISE_LIBRARY.findIndex(e=>e.id===id);if(index<0)return;libraryTargetDay=getActivePlan()[dayIndex]?.id||getActivePlan()[0].id;openExerciseGuide(index);
+}
+
+function openExerciseGuide(index) {
+  const e=EXERCISE_LIBRARY[index];if(!e)return;libraryGuideIndex=index;libraryGuideFocus=document.activeElement;
+  if(!getActivePlan().some(d=>d.id===libraryTargetDay))libraryTargetDay=getActivePlan()[currentDay].id;
+  document.getElementById('exercise-guide-title').textContent=e.name;
+  document.getElementById('exercise-guide-meta').textContent=`${e.level} · ${e.equipment==='body only'?'Bodyweight':e.equipment||'Other equipment'}`;
+  document.getElementById('exercise-guide-muscles').textContent='Main: '+libraryMuscleNames(e).join(', ')+(e.secondaryMuscles.length?' · Also: '+libraryMuscleNames(e,true).join(', '):'');
+  document.getElementById('exercise-guide-images').innerHTML=e.images.slice(0,2).map((file,i)=>`<figure><img src="${h(EXERCISE_LIBRARY_INFO.imageBase+file.split('/').map(encodeURIComponent).join('/'))}" alt="${h(e.name)} — position ${i+1}" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.textContent='Illustration unavailable offline'"><figcaption>Position ${i+1}</figcaption></figure>`).join('');
+  document.getElementById('exercise-guide-steps').innerHTML=e.instructions.map(step=>`<li>${h(step)}</li>`).join('');refreshGuideDestination();
+  document.getElementById('exercise-guide-modal').classList.add('open');document.getElementById('exercise-guide-close').focus({preventScroll:true});
+}
+
+function refreshGuideDestination() {
+  const e=EXERCISE_LIBRARY[libraryGuideIndex];if(!e)return;
+  document.getElementById('exercise-guide-day').innerHTML=libraryDayOptions(libraryTargetDay);const button=document.getElementById('exercise-guide-add');button.disabled=libraryAlreadyAdded(e);button.textContent=button.disabled?'Already in this day':'Add to this day';
+}
+
+function closeExerciseGuide(restoreFocus=true) {
+  document.getElementById('exercise-guide-modal').classList.remove('open');libraryGuideIndex=null;if(restoreFocus&&libraryGuideFocus?.isConnected)libraryGuideFocus.focus({preventScroll:true});
+}
+
+function exerciseGuideKey(event) {
+  if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeExerciseGuide();return;}
+  if(event.key!=='Tab')return;const focusable=[...document.querySelectorAll('#exercise-guide-modal button:not(:disabled),#exercise-guide-modal select,#exercise-guide-modal a[href]')];const first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+}
+
+function addLibraryExercise() {
+  const e=EXERCISE_LIBRARY[libraryGuideIndex],index=getActivePlan().findIndex(d=>d.id===libraryTargetDay);if(!e||index<0||libraryAlreadyAdded(e))return;
+  const day=getActivePlan()[index];if(day.exercises.length>=100){toast('A day supports up to 100 exercises');return;}
+  closeExerciseGuide(false);openExerciseEditor(index,null);document.getElementById('add-ex-name').value=e.name;selectedExerciseTemplate={name:e.name,bodyweight:e.equipment==='body only',libraryId:e.id};
+  document.getElementById('add-ex-sets').value=libraryDraft?.dayId===day.id&&libraryDraft.sets?libraryDraft.sets:'3';document.getElementById('add-ex-reps').value=libraryDraft?.dayId===day.id&&libraryDraft.reps?libraryDraft.reps:'8–12';hideExerciseSuggestions();document.getElementById('add-ex-sets').focus({preventScroll:true});
 }
 
 function validLocalDate(value) {
@@ -1759,8 +1978,18 @@ function changeBodyweightUnit(unit) {
   setWeightUnit(unit);if(id)editWeightEntry(id);document.getElementById('bw-date').value=date;if(kg!==null)input.value=toDisplayWeight(kg);
 }
 
+function usageBlockReason() {
+  if(!USAGE_CONFIG.websiteId)return 'Usage collection is not configured.';
+  if(location.protocol!=='https:'||location.hostname!==USAGE_CONFIG.hostname||![USAGE_CONFIG.path,USAGE_CONFIG.path+'index.html'].includes(location.pathname))return 'This is a local or preview app. Collection runs only on the live website.';
+  try{if(localStorage.getItem('analyticsOptOut')==='true')return 'Usage sharing is turned off on this device.';if(localStorage.getItem('umami.disabled'))return 'Umami is excluded in this browser.';}catch{return 'Browser storage is unavailable; collection is paused.';}
+  if(navigator.onLine===false)return 'You are offline. Collection will retry when connected.';
+  if(['1','yes'].includes(String(navigator.doNotTrack||window.doNotTrack)))return 'Your browser sends Do Not Track. This preference is respected.';
+  if(navigator.globalPrivacyControl===true)return 'Your browser enables Global Privacy Control. This preference is respected.';
+  return '';
+}
+
 function usageAllowed() {
-  try{return /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(USAGE_CONFIG.websiteId)&&USAGE_CONFIG.scriptUrl==='https://cloud.umami.is/script.js'&&location.protocol==='https:'&&location.hostname===USAGE_CONFIG.hostname&&[USAGE_CONFIG.path,USAGE_CONFIG.path+'index.html'].includes(location.pathname)&&navigator.onLine!==false&&!['1','yes'].includes(navigator.doNotTrack||window.doNotTrack)&&navigator.globalPrivacyControl!==true&&localStorage.getItem('analyticsOptOut')!=='true';}catch{return false;}
+  try{return /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(USAGE_CONFIG.websiteId)&&USAGE_CONFIG.scriptUrl==='https://cloud.umami.is/script.js'&&!usageBlockReason();}catch{return false;}
 }
 
 function cleanUsagePayload(type,payload) {
@@ -1771,21 +2000,55 @@ function cleanUsagePayload(type,payload) {
 
 function initializeUsageAnalytics() {
   if(!usageAllowed()||usageLoading||usageReady||usageFailed)return;
-  usageLoading=true;
+  installUsageDeliveryObserver();usageLoading=true;usageLastAttempt=Date.now();renderUsagePreference();
   const script=document.createElement('script');script.src=USAGE_CONFIG.scriptUrl;script.async=true;script.referrerPolicy='no-referrer';script.id='usage-analytics-script';
   script.dataset.websiteId=USAGE_CONFIG.websiteId;script.dataset.autoTrack='false';script.dataset.domains=USAGE_CONFIG.hostname;script.dataset.excludeSearch='true';script.dataset.excludeHash='true';script.dataset.doNotTrack='true';script.dataset.beforeSend='cleanUsagePayload';
-  script.onload=()=>{usageLoading=false;usageReady=typeof window.umami?.track==='function';usageFailed=!usageReady;const queued=usageQueue;usageQueue=[];if(usageAllowed()&&usageReady)queued.forEach(trackUsage);};
-  script.onerror=()=>{usageLoading=false;usageFailed=true;usageQueue=[];};
+  script.onload=()=>{usageLoading=false;usageReady=typeof window.umami?.track==='function';usageFailed=!usageReady;const queued=usageQueue;usageQueue=[];if(usageAllowed()&&usageReady)queued.forEach(trackUsage);renderUsagePreference();};
+  script.onerror=()=>{usageLoading=false;usageFailed=true;usageQueue=[];renderUsagePreference();};
   document.head.append(script);
+}
+
+function installUsageDeliveryObserver() {
+  if(usageObserved)return;usageObserved=true;const originalFetch=window.fetch;
+  window.fetch=function(input,options){
+    const pending=originalFetch.call(this,input,options);
+    const url=typeof input==='string'?input:input?.url;
+    if(url==='https://gateway.umami.is/api/send'&&options?.method==='POST'){
+      let pageview=false;try{const body=JSON.parse(options.body);pageview=body.type==='event'&&!body.payload?.name;}catch{}
+      const requestId=++usageRequestId,timer=setTimeout(()=>{if(usageRequestId===requestId&&usageDelivery==='sending'){if(pageview)usageVisitPending=false;usageDelivery='blocked';renderUsagePreference();}},10000);
+      usageDelivery='sending';renderUsagePreference();
+      Promise.resolve(pending).then(async response=>{
+        clearTimeout(timer);
+        let body=null;try{body=await response.clone().json();}catch{}
+        if(pageview)usageVisitPending=false;
+        if(!usageAllowed())return;
+        if(response.ok&&(typeof body?.cache==='string'||body?.sessionId)){usageDelivery='accepted';if(pageview)usageVisitSent=true;}
+        else usageDelivery=body?.beep==='boop'?'ignored':`rejected:${response.status}`;
+        renderUsagePreference();
+      }).catch(()=>{clearTimeout(timer);if(pageview)usageVisitPending=false;usageDelivery='blocked';renderUsagePreference();});
+    }
+    return pending;
+  };
+}
+
+function retryUsageAnalytics(manual=false,force=false) {
+  if(!usageAllowed()){renderUsagePreference();return;}
+  if(usageLoading)return;
+  if(!manual&&!force&&Date.now()-usageLastAttempt<60000)return;
+  usageLastAttempt=Date.now();
+  if(usageFailed){usageFailed=false;document.getElementById('usage-analytics-script')?.remove();}
+  if(manual)trackUsage('Connection Check');else if(!usageVisitSent)trackUsage('pageview');
+  renderUsagePreference();
 }
 
 function trackUsage(name) {
   try{
     if(!USAGE_EVENTS.has(name)||!usageAllowed()||usageFailed)return;
     if(!usageReady){if(usageQueue.length<30)usageQueue.push(name);initializeUsageAnalytics();return;}
-    if(name==='pageview'&&usageVisitSent)return;
+    if(name==='pageview'&&(usageVisitSent||usageVisitPending))return;
     const payload=cleanUsagePayload('event',name==='pageview'?{}:{name});if(!payload)return;
-    const pending=window.umami.track(payload);if(pending?.catch)pending.catch(()=>{});if(name==='pageview')usageVisitSent=true;
+    if(name==='pageview')usageVisitPending=true;
+    const pending=window.umami.track(payload);if(pending?.catch)pending.catch(()=>{if(name==='pageview')usageVisitPending=false;});
   }catch{} // Analytics never interrupts saving or editing a workout.
 }
 
@@ -1793,7 +2056,9 @@ function renderUsagePreference() {
   const input=document.getElementById('usage-analytics-toggle');if(!input)return;
   try{input.checked=localStorage.getItem('analyticsOptOut')!=='true';}catch{input.checked=false;}
   const status=document.getElementById('usage-analytics-status');
-  status.textContent=!USAGE_CONFIG.websiteId?'Usage collection is not active yet.':usageAllowed()?'Basic usage sharing is enabled on this device.':'Usage collection is inactive on this device or preview.';
+  const reason=usageBlockReason();
+  status.textContent=reason|| (usageFailed?'The analytics tracker could not load. A content blocker or connection may be preventing it.':usageLoading?'Loading analytics tracker…':usageDelivery==='accepted'?'Connected — Umami accepted a usage event.':usageDelivery==='blocked'?'The analytics request failed or was blocked. Your workouts still save normally.':usageDelivery==='ignored'?'Umami received the request but filtered out this visit.':usageDelivery.startsWith('rejected:')?`Umami did not accept the request (HTTP ${usageDelivery.split(':')[1]}).`:usageDelivery==='sending'?'Sending a basic usage event…':usageReady?'Tracker loaded. Tap Check connection to confirm delivery.':'Sharing is enabled. Waiting to connect.');
+  const check=document.getElementById('usage-connection-check');if(check){check.disabled=!!reason||usageLoading||usageDelivery==='sending';check.textContent=usageLoading||usageDelivery==='sending'?'Checking…':'Check connection';}
 }
 
 function setUsagePreference(enabled) {
@@ -1808,7 +2073,8 @@ function initializeApp() {
   rememberCurrentPlan();
   setupPresets();recomputePRs();syncWeeklyGoal();renderToday();renderPlan();
   trackUsage('pageview');trackUsage('View Today');
-  document.addEventListener('click',event=>{const wrapper=document.getElementById('exercise-autocomplete');if(wrapper&&!wrapper.contains(event.target))hideExerciseSuggestions();});
+  window.addEventListener('online',()=>retryUsageAnalytics(false,true));window.addEventListener('pageshow',()=>retryUsageAnalytics());document.addEventListener('visibilitychange',()=>{if(!document.hidden)retryUsageAnalytics();});
+  document.addEventListener('click',event=>{const wrapper=document.getElementById('exercise-autocomplete');if(wrapper&&!wrapper.contains(event.target))hideExerciseSuggestions();const muscle=document.getElementById('muscle-search');if(muscle&&!muscle.contains(event.target))hideMuscleSearch();});
   refreshStreakDate();window.addEventListener('focus',refreshStreakDate);window.addEventListener('pageshow',refreshStreakDate);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshStreakDate();});setInterval(refreshStreakDate,60000);
   let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(document.getElementById('page-progress').classList.contains('active'))renderProgress();if(document.getElementById('page-bodyweight').classList.contains('active'))renderBodyweightChart();},150);});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));editingExIndex=null;editingDayIndex=null;dayEditing=null;catchupPreview=null;}});

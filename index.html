@@ -1097,7 +1097,7 @@
     .stats-grid { grid-template-columns: 1fr 1fr; }
   }
 </style>
-<link rel="stylesheet" href="custom.css?v=f6a574ae33cf">
+<link rel="stylesheet" href="custom.css?v=5f11ccc1b021">
 </head>
 <body>
 
@@ -1110,6 +1110,7 @@
     <button class="nav-tab" data-page="prs" onclick="showPage('prs')">PRs</button>
     <button class="nav-tab" data-page="stats" onclick="showPage('stats')">Stats</button>
     <button class="nav-tab" data-page="progress" onclick="showPage('progress')">Progress</button>
+    <button class="nav-tab" data-page="exercises" onclick="showPage('exercises')">Exercises</button>
     <button class="nav-tab" data-page="bodyweight" onclick="showPage('bodyweight')">Body Weight</button>
     <button class="nav-tab" data-page="plan" onclick="showPage('plan')">Plan</button>
     <button class="nav-tab" data-page="settings" onclick="showPage('settings')">Settings</button>
@@ -1223,6 +1224,14 @@
   <div class="stats-grid" id="progress-summary"></div>
 </div>
 
+<section id="page-exercises" class="page">
+  <div class="section-title">Exercise Library</div><p class="section-sub">Find your next exercise. Learn the movement. Make it part of your plan.</p>
+  <div class="library-layout"><aside class="library-map-panel"><div class="library-eyebrow">CHOOSE A MUSCLE</div><div class="library-view-buttons"><button type="button" data-body-view="both" onclick="setLibraryView('both')">Both</button><button type="button" data-body-view="front" onclick="setLibraryView('front')">Front</button><button type="button" data-body-view="back" onclick="setLibraryView('back')">Back</button></div><div id="library-body"></div><p id="library-selected-muscle"></p><div class="muscle-search" id="muscle-search"><label for="muscle-search-input">Search muscle</label><input id="muscle-search-input" type="search" placeholder="Try rear delt, lats, quads…" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="muscle-search-options" oninput="renderMuscleSearch()" onfocus="this.select();renderMuscleSearch()" onkeydown="muscleSearchKey(event)"><div id="muscle-search-options" class="muscle-search-options" role="listbox" aria-label="Muscle suggestions" hidden></div><span id="muscle-search-status" class="exercise-suggestion-status" role="status" aria-live="polite"></span></div><button class="library-clear" onclick="setLibraryFilter('muscle','')">All muscles</button></aside>
+  <div class="library-content"><div class="library-filters"><label class="library-search-label">Search exercises<input id="library-search" type="search" autocomplete="off" placeholder="Try bench press, curl, squat…" oninput="setLibraryFilter('query',this.value)"></label><label>Muscle<select id="library-muscle" onchange="setLibraryFilter('muscle',this.value)"></select></label><label>Equipment<select id="library-equipment" onchange="setLibraryFilter('equipment',this.value)"></select></label><label>Experience<select id="library-level" onchange="setLibraryFilter('level',this.value)"><option value="">All levels</option><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="expert">Expert</option></select></label><label>Add exercises to<select id="library-target-day" onchange="changeLibraryTarget(this.value)"></select></label></div>
+  <p id="library-results-count" class="library-count" role="status" aria-live="polite"></p><div id="library-results" class="library-results"></div><button id="library-load-more" class="library-more" onclick="libraryLimit+=24;renderLibraryResults()">Show more</button>
+  <p class="library-credit">Exercise instructions and illustrations: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener noreferrer">Free Exercise DB</a> · <a href="EXERCISE-DATA-LICENSE.txt" target="_blank" rel="noopener">Public-domain licence</a>. Body map adapted from <a href="https://github.com/HichamELBSI/react-native-body-highlighter" target="_blank" rel="noopener noreferrer">Hicham ELABBASSI</a> · <a href="BODY-MAP-LICENSE.txt" target="_blank" rel="noopener">MIT licence</a>. Choose your own sets and rep targets.</p></div></div>
+</section>
+<div class="modal-overlay" id="exercise-guide-modal" onclick="if(event.target===this)closeExerciseGuide()" onkeydown="exerciseGuideKey(event)"><div class="modal exercise-guide-modal" role="dialog" aria-modal="true" aria-labelledby="exercise-guide-title"><button id="exercise-guide-close" class="guide-close" type="button" onclick="closeExerciseGuide()" aria-label="Close exercise guide">×</button><h2 id="exercise-guide-title" class="modal-title"></h2><p id="exercise-guide-meta" class="library-guide-meta"></p><p id="exercise-guide-muscles" class="library-guide-meta"></p><div id="exercise-guide-images" class="library-guide-images"></div><p class="library-image-note">Illustrations load online. Written instructions are available offline.</p><h3>How to do it</h3><ol id="exercise-guide-steps" class="library-guide-steps"></ol><div class="library-guide-add"><label>Workout day<select id="exercise-guide-day" onchange="changeLibraryTarget(this.value)"></select></label><button type="button" id="exercise-guide-add" class="modal-btn primary" onclick="addLibraryExercise()">Add to this day</button></div></div></div>
 <div id="page-bodyweight" class="page">
   <div class="section-title">Body Weight</div>
   <p class="section-sub">Log your weight and follow your own trend over time.</p>
@@ -1240,7 +1249,7 @@
 <div id="page-plan" class="page">
   <div class="section-title">The Plan</div>
   <div class="section-sub">Make every day, exercise and set count your own.</div>
-  <div class="plan-transfer"><button type="button" onclick="exportWorkoutPlan()">Export Plan</button><button type="button" onclick="document.getElementById('import-plan-input').click()">Import Plan</button><input id="import-plan-input" type="file" accept=".json,application/json" hidden onchange="importWorkoutPlan(event)"><span>Share just your workout plan.</span></div>
+  <div class="plan-transfer"><button type="button" onclick="exportWorkoutPlan()">Export Plan</button><button type="button" onclick="document.getElementById('import-plan-input').click()">Import Plan</button><input id="import-plan-input" type="file" accept=".json,application/json" hidden onchange="importWorkoutPlan(event)"><button type="button" onclick="openExerciseLibrary()">Browse exercises</button><span>Share just your workout plan.</span></div>
   <div class="plan-toolbar"><label class="grow">Plan name<input id="plan-name-input" maxlength="120" autocomplete="off"></label><button onclick="renamePlan()">Save Plan</button></div>
   <div class="plan-toolbar"><label class="grow">Quick select<select id="plan-preset"></select></label><button onclick="applyPreset(document.getElementById('plan-preset').value)">Use plan</button><button onclick="openDayEditor()">＋ Add day</button></div>
   <p class="preset-note">Editable starting templates, not a ranking. Gym splits and home options. <a href="https://acsm.org/resistance-training-guidelines-update-2026/" target="_blank" rel="noopener">Training guidance</a> · <a href="https://www.nhs.uk/live-well/exercise/strength-exercises/" target="_blank" rel="noopener">Home exercise guide</a></p>
@@ -1286,6 +1295,7 @@
     <div class="plan-day-name" style="margin-bottom:10px;">Usage Analytics</div>
     <p class="plan-focus">Basic visit and feature-use events help improve the app. Exercise names, workout records, body weights and plan names are not included. Umami processes basic browser and usage information. This choice applies to this browser.</p>
     <label class="usage-toggle"><input id="usage-analytics-toggle" type="checkbox" onchange="setUsagePreference(this.checked)">Share basic usage</label><p id="usage-analytics-status" class="plan-focus" role="status"></p>
+    <button id="usage-connection-check" class="bw-link" onclick="retryUsageAnalytics(true)">Check connection</button><p class="plan-focus" style="margin-top:8px;font-size:11px;">Sends one basic connection-test event. No workout details are included.</p>
   </div><div class="plan-card" style="padding:20px;margin-bottom:16px;">
     <div class="plan-day-name" style="margin-bottom:10px;">Backup & Restore</div>
     <div class="plan-focus" style="margin-bottom:14px;">Export everything: workout plan, history, personal records, progress, streaks, body weight, unfinished sets, scheduled adjustments, all saved plans and saved preferences. Restore the backup on another device to continue. For plan-only sharing, use the Plan page.</div>
@@ -1313,7 +1323,7 @@
   <div class="modal" style="max-width:400px;" onclick="event.stopPropagation()">
     <div class="modal-title" id="add-ex-modal-title">Add Exercise</div>
     <div class="modal-sub" id="add-ex-day-name"></div>
-    <div class="exercise-autocomplete" id="exercise-autocomplete"><label class="exercise-name-label" for="add-ex-name">Exercise name</label><div class="exercise-name-input-wrap"><input class="modal-input" id="add-ex-name" aria-label="Exercise name" maxlength="120" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="exercise-name-suggestions" aria-describedby="exercise-name-help" autocomplete="off" spellcheck="false" placeholder="Search or type an exercise" oninput="renderExerciseSuggestions()" onfocus="renderExerciseSuggestions()" onclick="if(document.getElementById('exercise-name-suggestions').hidden)renderExerciseSuggestions()" onkeydown="exerciseSuggestionKey(event)"><div class="exercise-name-suggestions" id="exercise-name-suggestions" role="listbox" aria-label="Exercise suggestions" hidden></div></div><p class="exercise-name-help" id="exercise-name-help">Your exercises first, then common gym and home options. Custom names work too.</p><div id="exercise-name-status" class="exercise-suggestion-status" role="status" aria-live="polite"></div></div>
+    <button id="browse-exercises-editor" class="exercise-guide-link" type="button" onclick="openExerciseLibrary()">Browse exercises by muscle →</button><div class="exercise-autocomplete" id="exercise-autocomplete"><label class="exercise-name-label" for="add-ex-name">Exercise name</label><div class="exercise-name-input-wrap"><input class="modal-input" id="add-ex-name" aria-label="Exercise name" maxlength="120" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="exercise-name-suggestions" aria-describedby="exercise-name-help" autocomplete="off" spellcheck="false" placeholder="Search or type an exercise" oninput="renderExerciseSuggestions()" onfocus="renderExerciseSuggestions()" onclick="if(document.getElementById('exercise-name-suggestions').hidden)renderExerciseSuggestions()" onkeydown="exerciseSuggestionKey(event)"><div class="exercise-name-suggestions" id="exercise-name-suggestions" role="listbox" aria-label="Exercise suggestions" hidden></div></div><p class="exercise-name-help" id="exercise-name-help">Your exercises first, then common gym and home options. Custom names work too.</p><div id="exercise-name-status" class="exercise-suggestion-status" role="status" aria-live="polite"></div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <input class="modal-input" id="add-ex-sets" type="number" aria-label="Number of sets" placeholder="Sets (e.g. 3)" min="1" max="100" step="1" style="margin-bottom:0;">
       <input class="modal-input" id="add-ex-reps" aria-label="Rep target" maxlength="80" type="text" placeholder="Reps (e.g. 8–12)" style="margin-bottom:0;">
@@ -1373,6 +1383,7 @@
   <button class="rest-timer-fab" onclick="toggleRestTimerPanel()">⏱ <span id="rest-timer-fab-time"></span></button>
 </div>
 
-<script src="app.js?v=108fc4ae8389"></script>
+<script src="exercise-library-data.js?v=a907b6a324f5"></script>
+<script src="app.js?v=1bc6037703d4"></script>
 </body>
 </html>
